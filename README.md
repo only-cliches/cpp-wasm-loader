@@ -16,7 +16,6 @@ You should be able to run simple C/C++ files in any modern browser that supports
 Webpack settings
 ```js
 module.exports = {
-  // ...
   module: {
     rules: [
       {
@@ -30,9 +29,11 @@ module.exports = {
             emccFlags: ['-O3']
           }
         }
-      },
-      // ...
+      }
     ]
+  },
+  externals: {
+    'fs': true
   }
 }
 ```

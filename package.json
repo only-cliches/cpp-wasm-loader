@@ -3,7 +3,7 @@
   "description": "Webpack loader that transforms C/C++ source files directly into WASM module objects using Emscripten",
   "author": "Jakub Beránek",
   "license": "MIT",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "keywords": [
     "wasm",
     "webpack",
