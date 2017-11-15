@@ -57,7 +57,7 @@ Usage in Javascript
 ```js
 import wasm from 'source.c';
 
-module.initialize().then(module => {
+wasm.initialize().then(module => {
   const result = module._roll_dice();
   console.log(result);
 });
