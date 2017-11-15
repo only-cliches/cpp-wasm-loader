@@ -9,6 +9,9 @@ The C/C++ files have to know about Emscripten, so you can export functions. For 
 things it's enough to include emscripten and add EMSCRIPTEN_KEEPALIVE to your functions
 (+ extern "C" for C++).
 
+You should be able to run simple C/C++ files in any modern browser that supports WASM
+(Chrome, Firefox etc.).
+
 ## Usage
 Webpack settings
 ```js
@@ -55,7 +58,7 @@ int EMSCRIPTEN_KEEPALIVE roll_dice() {
 
 Usage in Javascript
 ```js
-import wasm from 'source.c';
+import wasm from './source.c';
 
 wasm.initialize().then(module => {
   const result = module._roll_dice();
