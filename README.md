@@ -23,8 +23,6 @@ module.exports = {
         use: {
           loader: 'cpp-wasm-loader',
           options: {
-            // Path to your 'build' or 'dist' directory relative to project root
-            buildPath: 'build',
             emccPath: 'path-to-emcc',
             emccFlags: ['-O3']
           }
@@ -72,7 +70,6 @@ The following options can be added to the Webpack loader query:
 
 | Name | Description | Required | Default |
 | ---- | ----------- | -------- | ------- |
-| `buildPath` |  Path to your 'build' or 'dist' directory relative to project root | true| |
 | `emccPath` | Path to your Emscripten binary (emcc or em++) | false | emcc |
 | `emccFlags` | Array of compilation flags passed to Esmcripten | false | ['-O3'] |
 
