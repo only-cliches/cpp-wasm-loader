@@ -14,12 +14,7 @@ const writeFile = Promise.promisify(fs.writeFile);
 const execFile = Promise.promisify(cp.execFile);
 const rf = Promise.promisify(rimraf);
 
-function buildModule(wasmName, indexContent) {
-  const Module = {
-    wasmBinaryFile: wasmName,
-    ENVIRONMENT: 'WEB',
-  };
-
+function buildModule(publicPath, wasmName, indexContent) {
   return `module.exports = (function(existingModule)
           {
               return {
@@ -37,7 +32,11 @@ function buildModule(wasmName, indexContent) {
                   });
                 }
               }
-            })(${JSON.stringify(Module)})`;
+            })({
+              wasmBinaryFile: ${JSON.stringify(wasmName)},
+              ENVIRONMENT: 'WEB',
+              locateFile: function(name) { return ${JSON.stringify(publicPath)} + name; }
+            })`;
 }
 
 function createBuildWasmName(resource, content) {
@@ -75,7 +74,7 @@ export default async function loader(content) {
 
     this.emitFile(wasmBuildName, wasmContent);
 
-    const module = buildModule(wasmBuildName, indexContent);
+    const module = buildModule(options.publicPath, wasmBuildName, indexContent);
 
     if (folder !== null) {
       await rf(folder);

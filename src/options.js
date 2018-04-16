@@ -6,8 +6,9 @@ export function loadOptions(loader)
 
   const emccPath = options.emccPath ? options.emccPath : (process.platform === 'win32' ? 'em++.bat' : 'em++');
   const emccFlags = options.emccFlags ? options.emccFlags : ['-O3'];
+  const publicPath = options.publicPath ? options.publicPath : '';
 
   return {
-    emccPath, emccFlags
+    emccPath, emccFlags, publicPath
   };
 }
