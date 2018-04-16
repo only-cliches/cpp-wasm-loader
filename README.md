@@ -23,6 +23,7 @@ module.exports = {
         use: {
           loader: 'cpp-wasm-loader',
           options: {
+            publicPath: 'build',
             emccPath: 'path-to-emcc',
             emccFlags: ['-O3']
           }
@@ -70,6 +71,7 @@ The following options can be added to the Webpack loader query:
 
 | Name | Description | Required | Default |
 | ---- | ----------- | -------- | ------- |
+| `publicPath` | Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config. | false | '' |
 | `emccPath` | Path to your Emscripten binary (emcc or em++) | false | emcc |
 | `emccFlags` | Array of compilation flags passed to Esmcripten | false | ['-O3'] |
 
