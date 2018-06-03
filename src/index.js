@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const tmp = require('tmp');
 const rimraf = require('rimraf');
+const md5 = require("md5");
 
 const tmpDir = _bluebird2.default.promisify(tmp.dir);
 const readFile = _bluebird2.default.promisify(fs.readFile);
@@ -62,6 +63,11 @@ function buildModule(wasmArray) {
 	}`;
 }
 
+function createBuildWasmName(resource, content) {
+  const fileName = path.basename(resource, path.extname(resource));
+  return `${fileName}-${md5(content)}.wasm`;
+}
+
 exports.default = async function loader(content) {
 	let cb = this.async();
 	let folder = null;
@@ -69,7 +75,9 @@ exports.default = async function loader(content) {
 	try {
 		const options = (0, _options.loadOptions)(this);
 
-		const inputFile = `input${path.extname(this.resourcePath)}`;
+    const inputFile = `input${path.extname(this.resourcePath)}`;
+    const wasmBuildName = createBuildWasmName(this.resourcePath, content);
+    const indexFile = wasmBuildName.replace('.wasm', '.js');
 
 		options.emccFlags = [inputFile, '-s', 'WASM=1'].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 

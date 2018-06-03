@@ -16,16 +16,13 @@
     "url": "https://github.com/ClickSimply/cpp-wasm-loader.git"
   },
   "main": "src/cjs.js",
-  "scripts": {
-
-  },
+  "scripts": {},
   "dependencies": {
-    "tmp": "^0.0.33",
-    "rimraf": "^2.6.2"
+    "md5": "^2.2.1",
+    "rimraf": "^2.6.2",
+    "tmp": "^0.0.33"
   },
-  "devDependencies": {
-
-  },
+  "devDependencies": {},
   "files": [
     "src"
   ],
