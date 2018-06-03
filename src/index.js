@@ -4,7 +4,7 @@ const _options = require('./options');
 
 function _toConsumableArray(arr) {
 	if (Array.isArray(arr)) {
-    let arr2 = Array(arr.length);
+		let arr2 = Array(arr.length);
 		for (let i = 0; i < arr.length; i++) {
 			arr2[i] = arr[i];
 		}
@@ -64,8 +64,8 @@ function buildModule(wasmArray) {
 }
 
 function createBuildWasmName(resource, content) {
-  const fileName = path.basename(resource, path.extname(resource));
-  return `${fileName}-${md5(content)}.wasm`;
+	const fileName = path.basename(resource, path.extname(resource));
+	return `${fileName}-${md5(content)}.wasm`;
 }
 
 exports.default = async function loader(content) {
@@ -75,9 +75,9 @@ exports.default = async function loader(content) {
 	try {
 		const options = (0, _options.loadOptions)(this);
 
-    const inputFile = `input${path.extname(this.resourcePath)}`;
-    const wasmBuildName = createBuildWasmName(this.resourcePath, content);
-    const indexFile = wasmBuildName.replace('.wasm', '.js');
+		const inputFile = `input${path.extname(this.resourcePath)}`;
+		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
+		const indexFile = wasmBuildName.replace('.wasm', '.js');
 
 		options.emccFlags = [inputFile, '-s', 'WASM=1'].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
@@ -91,6 +91,7 @@ exports.default = async function loader(content) {
 			cwd: folder
 		});
 
+		const wasmFile = wasmBuildName;
 		const wasmContent = await readFile(path.join(folder, wasmFile));
 
 		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
