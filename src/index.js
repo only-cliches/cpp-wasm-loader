@@ -13,6 +13,12 @@ function _toConsumableArray(arr) {
 	}
 }
 
+function _interopRequireDefault(obj) {
+	return obj && obj.__esModule ? obj : {
+		default: obj
+	};
+}
+
 const _bluebird = require('bluebird');
 const _bluebird2 = _interopRequireDefault(_bluebird);
 const cp = require('child_process');
