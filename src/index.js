@@ -1,91 +1,95 @@
-import Promise from 'bluebird';
-import { loadOptions } from './options';
+'use strict';
 
+const _options = require('./options');
+
+function _toConsumableArray(arr) {
+	if (Array.isArray(arr)) {
+		for (let i = 0, arr2 = Array(arr.length); i < arr.length; i++) {
+			arr2[i] = arr[i];
+		}
+		return arr2;
+	} else {
+		return Array.from(arr);
+	}
+}
+
+const _bluebird = require('bluebird');
+const _bluebird2 = _interopRequireDefault(_bluebird);
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const tmp = require('tmp');
 const rimraf = require('rimraf');
-const md5 = require('md5');
 
-const tmpDir = Promise.promisify(tmp.dir);
-const readFile = Promise.promisify(fs.readFile);
-const writeFile = Promise.promisify(fs.writeFile);
-const execFile = Promise.promisify(cp.execFile);
-const rf = Promise.promisify(rimraf);
+const tmpDir = _bluebird2.default.promisify(tmp.dir);
+const readFile = _bluebird2.default.promisify(fs.readFile);
+const writeFile = _bluebird2.default.promisify(fs.writeFile);
+const execFile = _bluebird2.default.promisify(cp.execFile);
+const rf = _bluebird2.default.promisify(rimraf);
 
-function buildModule(publicPath, wasmName, indexContent) {
-  return `module.exports = (function(existingModule)
-          {
-              return {
-                initialize: function(userDefinedModule)
-                {
-                  return new Promise((resolve, reject) =>
-                  {
-                    if (!userDefinedModule)
-                    {
-                      userDefinedModule = {}
-                    }
-                    var Module = Object.assign({}, userDefinedModule, existingModule);
-                    Module['onRuntimeInitialized'] = () => resolve(Module);
-                    \n${indexContent}\n
-                  });
-                }
-              }
-            })({
-              wasmBinaryFile: ${JSON.stringify(wasmName)},
-              ENVIRONMENT: 'WEB',
-              locateFile: function(name) { return ${JSON.stringify(publicPath)} + name; }
-            })`;
+function buildModule(wasmArray) {
+
+	return `module.exports = {
+		init: () => {
+			return new Promise((res, rej) => {
+				const mem = new WebAssembly.Memory({initial: 256, maximum: 256});
+				WebAssembly.instantiateStreaming(
+					new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {headers: {"content-type":"application/wasm"}}), 
+					{
+						env: {
+							'abortStackOverflow': _ => { throw new Error('overflow'); },
+							'table': new WebAssembly.Table({initial: 0, maximum: 0, element: 'anyfunc'}),
+							'tableBase': 0,
+							'memory': mem,
+							'memoryBase': 1024,
+							'STACKTOP': 0,
+							'STACK_MAX': mem.buffer.byteLength,
+						}
+					}
+				)
+				.then(e => {
+					res(e.instance.exports);
+				}).catch(rej);
+			});
+		}
+	}`;
 }
 
-function createBuildWasmName(resource, content) {
-  const fileName = path.basename(resource, path.extname(resource));
-  return `${fileName}-${md5(content)}.wasm`;
-}
+exports.default = async function loader(content) {
+	let cb = this.async();
+	let folder = null;
 
-export default async function loader(content) {
-  const cb = this.async();
-  let folder = null;
+	try {
+		const options = (0, _options.loadOptions)(this);
 
-  try {
-    const options = loadOptions(this);
+		const inputFile = `input${path.extname(this.resourcePath)}`;
 
-    const wasmBuildName = createBuildWasmName(this.resourcePath, content);
+		options.emccFlags = [inputFile, '-s', 'WASM=1'].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
-    const inputFile = `input${path.extname(this.resourcePath)}`;
-    const indexFile = wasmBuildName.replace('.wasm', '.js');
-    const wasmFile = wasmBuildName;
+		folder = await tmpDir();
 
-    options.emccFlags = [inputFile, '-s', 'WASM=1', ...options.emccFlags, '-o', indexFile];
+		// write source to tmp directory
+		await writeFile(path.join(folder, inputFile), content);
 
-    folder = await tmpDir();
+		// compile source file to WASM
+		await execFile(options.emccPath, options.emccFlags, {
+			cwd: folder
+		});
 
-    // write source to tmp directory
-    await writeFile(path.join(folder, inputFile), content);
+		const wasmContent = await readFile(path.join(folder, wasmFile));
 
-    // compile source file to WASM
-    await execFile(options.emccPath, options.emccFlags, {
-      cwd: folder,
-    });
+		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
 
-    const indexContent = await readFile(path.join(folder, indexFile), 'utf8');
-    const wasmContent = await readFile(path.join(folder, wasmFile));
+		if (folder !== null) {
+			await rf(folder);
+		}
+		cb(null, module);
+	} catch (e) {
+		if (folder !== null) {
+			await rf(folder);
+		}
+		cb(e);
+	}
 
-    this.emitFile(wasmBuildName, wasmContent);
-
-    const module = buildModule(options.publicPath, wasmBuildName, indexContent);
-
-    if (folder !== null) {
-      await rf(folder);
-    }
-    cb(null, module);
-  } catch (e) {
-    if (folder !== null) {
-      await rf(folder);
-    }
-    cb(e);
-  }
-
-  return null;
-}
+	return null;
+};
