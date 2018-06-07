@@ -105,7 +105,7 @@ exports.default = async function loader(content) {
 
 		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
-		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
+		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-s", "ALLOW_MEMORY_GROWTH=1", "-Os"];
 		options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
 
 		folder = await tmpDir();
@@ -124,10 +124,9 @@ exports.default = async function loader(content) {
 		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
 
 		if (options.emitWasm) {
-			this.emitFile("build.wasm", wasmContent);
+			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm", wasmContent);
 		}
 		
-
 		if (folder !== null) {
 			await rf(folder);
 		}
