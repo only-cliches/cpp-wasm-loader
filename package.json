@@ -1,6 +1,6 @@
 {
   "name": "cpp-min-wasm-loader",
-  "description": "Webpack loader that transforms C/C++ source files directly into WASM module objects using Emscripten",
+  "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
   "author": "Jakub Beránek, Scott Lott",
   "license": "MIT",
   "version": "0.5.0",
@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ClickSimply/cpp-wasm-loader.git"
+    "url": "https://github.com/ClickSimply/cpp-min-wasm-loader.git"
   },
   "main": "src/cjs.js",
   "scripts": {},
