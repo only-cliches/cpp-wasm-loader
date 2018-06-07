@@ -88,7 +88,7 @@ exports.default = async function loader(content) {
 		await writeFile(path.join(folder, inputFile), content);
 
 		// compile source file to WASM
-		await execFile(options.emccPath, options.emccFlags, {
+		await execFile(options.emccPath, options.emccFlags.concat(['-o', indexFile]), {
 			cwd: folder
 		});
 
