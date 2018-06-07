@@ -14,6 +14,7 @@ Load C/C++ source files directly into javascript with a zero bloat.
 - Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
 - Provides export for WebAssembly memory management and access.
 - Includes a small memory manager class to handle `malloc` and `free` on the javascript side (saves ~6KB).
+- Easily add custom javascript functions to call from C/C++ or vise versa.
 
 ## Installation
 1. Install Emscripten following the instructions [here](https://kripken.github.io/emscripten-site/docs/getting_started/downloads.html).
@@ -45,8 +46,10 @@ You can also view a complete working example on github [here](https://github.com
 
 extern "C"
 {
+	/* Declare Javascript function for use in C/C++ */
+	extern int sub(int a, int b);
 
-	EMSCRIPTEN_KEEPALIVE /* <= Needed to export this function to javascript */
+	EMSCRIPTEN_KEEPALIVE /* <= Needed to export this function to javascript "module.exports" */
 	int add(int a, int b)
 	{
 		return a + b;
@@ -58,7 +61,11 @@ extern "C"
 **add.js**
 ```js
 const wasm = require("./add.c");
-wasm.init().then((module) => {
+wasm.init((imports) => {
+	// custom javascript function to be called from C;
+	imports._sub = (a, b) => a - b;
+	return imports;
+}).then((module) => {
 	console.log(module.exports.add(1, 2)); // 3
 	console.log(module.memory) // WebAssembly Memory Buffer object
 	console.log(module.memoryManager) // Memory Manager Class
@@ -68,13 +75,11 @@ wasm.init().then((module) => {
 ```
 
 ## Using The Memory Manager Class
-The memory management class is only useful for handling 32 bit floating point variables.  Every variable allocated by the memory manager class will be a 32 bit floating point number.
-
 The class can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++;
 
 If you're unfamiliar with pointers/memory management jump to [this](#pointers-and-whatnot) part of the readme.
 
-Memory can only be allocated or freed up with the javascript API.  Values can be read or adjusted by C/C++ or Javascript using the provided memory addresses.
+Memory can be allocated through javascript or C/C++.  Values can be read or adjusted by C/C++ or Javascript using the provided memory addresses.
 
 ### Memory Manager API
 To access the memory manager you can grab it off the module object after webassembly has initialized:
@@ -109,6 +114,20 @@ The pointers are always referencing a `float` type.
 
 extern "C"
 {
+	/* Functions provided by Memory API */
+	extern double mallocjs(int len);
+    extern void freejs(int start, int len);
+
+	EMSCRIPTEN_KEEPALIVE /* Allocate memory, returns only the first memory address */
+	double doMalloc(int len) {
+		return mallocjs(len);
+	}
+
+	EMSCRIPTEN_KEEPALIVE /* Free memory */
+	void doFree(int start, int len) {
+		freejs(start, len);
+	}
+
 	EMSCRIPTEN_KEEPALIVE /* set the value at a given pointer */
 	void setC(float* ptr, float value) {
 		*ptr = value;
@@ -126,6 +145,12 @@ extern "C"
 		float p1 = *ptr1;
 		float p2 = *ptr2;
 		return p1 + p2;
+	}
+
+	EMSCRIPTEN_KEEPALIVE /* get address of pointer */
+	float* address(float* ptr) 
+	{
+		return &*ptr;
 	}
 }
 ```
@@ -157,6 +182,8 @@ wasm.init().then((module) => {
 
 	console.log(module.exports.addC(addr[0], addr[1])) // use C to add the two numbers, returns 35;
 	console.log(memory.get(addr[0]) + memory.get(addr[1])) // use JS to add the two numbers, also 35;
+
+	console.log(module.exports.address(addr[0]) === addr[0]) // true;
 	
 	// free up the memory
 	memory.free(addr);
@@ -184,17 +211,42 @@ The webpack loader has several options:
 ### WebAssembly Memory
 The `module.memory` export is a buffer that holds memory that is shared between javascript and webassembly.  You can read about how to use it in these [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WebAssembly/Memory).
 
-### Initialization
-Emscripten normally provides a javascript file with webassembly builds that handles module loading, memory management and lots of different edge cases.  This loader omits that default javascript code entirely and uses the smallest possible subset of features, this means you may need to import additional items into the webassembly `imports` object if you're using more advanced webassembly features.
+### Calling JS Functions from C/C++
+It's pretty easy to setup JS functions to be called from within C/C++.  While it's technically possible to setup functions to use strings/charecters it's much easier to just stick to numbers.
 
-In this case, you can access the webassembly `import` object and modify it in the init object:
+Let's expose a function in javascript that will add two numbers
+
+**customFn.js**
 ```js
-const wasm = require("./add.c");
-wasm.init((importENV) => {
-	// make any changes to importENV as needed;
-	return importENV;
+const wasm = require("./customFn.c");
+wasm.init((imports) => {
+	// our custom javascript function
+	imports._add = (a, b) => { 
+		return a + b;
+	}
+	return imports;
 }).then....
 ```
+
+**customFn.c**
+```c
+#include <emscripten.h>
+
+extern "C"
+{
+	/* Declare custom js function */
+	extern int add(int a, int b);
+
+	EMSCRIPTEN_KEEPALIVE /* calling the javascript function from a C function */
+	int doAdd(int a, int b) {
+		return add(a, b);
+	}
+
+}
+```
+
+WebAssembly can often crunch numbers several times faster than Javascript, but there is a **HEAVY** penalty to the execution speed when calling JS from C/C++ or vice versa.  The more you can send a batch job to C/C++ and pick it up later when it's done the better performance you'll experience.
+
 
 ## Pointers and Whatnot
 WebAssembly shares a major limitation with many other low level languages: some memory must be managed by hand.

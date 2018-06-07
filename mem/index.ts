@@ -1,110 +1,120 @@
 class ASM_Memory {
 
-    public m: Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
+    //public m: Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
+    public mem: {
+        char: Int8Array,
+        1: Int8Array,
+        short: Int16Array,
+        2: Int16Array,
+        int: Int32Array,
+        4: Int32Array,
+        float: Float32Array,
+        40: Float32Array,
+        double: Float64Array
+        80: Float64Array,
+    };
 
     public allocList: boolean[];
 
     public allocPointer: number;
-
-    public b: number;
 
     private max: number;
 
     constructor(buffer: ArrayBuffer) {
         this.allocList = [];
         this.allocPointer = 0;
-        this.b = 4 // bytes;
-        this.m = new Float32Array(buffer);
-        this.max = this.m.length / this.b;
-        /*switch (type) {
-            case "char":
-            case "int8":
-                this.b = 1 // bytes;
-                this.m = new Int8Array(buffer);
-                break;
-            case "uchar":
-            case "uint8":
-                this.b = 1 // bytes;
-                this.m = new Uint8Array(buffer);
-                break;
-            case "short":
-            case "int16":
-                this.b = 2 // bytes;
-                this.m = new Int16Array(buffer);
-                break;
-            case "ushort":
-            case "uint16":
-                this.b = 2 // bytes;
-                this.m = new Uint16Array(buffer);
-                break;
-            case "int":
-            case "int32":
-                this.b = 4 // bytes;
-                this.m = new Int32Array(buffer);
-                break;
-            case "uint":
-            case "uint32":
-                this.b = 4 // bytes;
-                this.m = new Uint32Array(buffer);
-                break;
-            case "float":
-            case "float32":
-                this.b = 4 // bytes;
-                this.m = new Float32Array(buffer);
-                break;
-            case "double":
-            case "float64":
-            default:
-                this.b = 8; // bytes
-                this.m = new Float64Array(buffer);
-        }*/
+        this.mem = {
+            1: new Int8Array(0),
+            2: new Int16Array(0),
+            4: new Int32Array(0),
+            40: new Float32Array(0),
+            80: new Float64Array(0),
+            char: new Int8Array(buffer),
+            short: new Int16Array(buffer),
+            int: new Int32Array(buffer),
+            float: new Float32Array(buffer),
+            double: new Float64Array(buffer)
+        };
+        this.mem[1] = this.mem.char;
+        this.mem[2] = this.mem.short;
+        this.mem[4] = this.mem.int;
+        this.mem[40] = this.mem.float;
+        this.mem[80] = this.mem.double;
+
+        this.max = buffer.byteLength - 1;
     }
 
-    public set(addr: number, value: number) {
-        this.m[addr / this.b] = value;
+    public set(addr: number, value: number, type: 1|2|4|40|80 = 40) {
+        this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT] = value;
         return this;
     }
 
-    public get(addr: number): number {
-        return this.m[addr / this.b];
+    public get(addr: number, type: 1|2|4|40|80 = 40): number {
+        return this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT];
     }
 
-    public malloc(size: number): number[] {
+    public malloc(size: number, type: 1|2|4|40|80 = 40): number[] {
         let addresses: number[] = [];
-        let remainingAdd = size;
+        let remainingAdd = size * this.mem[type].BYTES_PER_ELEMENT;
+
+        const mod = this.allocPointer % this.mem[type].BYTES_PER_ELEMENT;
+        if (mod) {
+            this.allocPointer -= mod;
+            this.allocPointer += this.mem[type].BYTES_PER_ELEMENT;
+        }
+        
         while (remainingAdd) {
             let numTries = 0;
-
             const tryAlloc = () => {
                 if (this.allocPointer >= this.max) {
                     this.allocPointer = 0;
                 }
                 numTries++;
                 if (numTries >= this.max) {
-                    throw new Error("No memory left!");
+                    throw new Error("Not enough memory left!");
                 }
 
                 if (!this.allocList[this.allocPointer]) {
-                    addresses.push(this.allocPointer * this.b);
-                    this.allocList[this.allocPointer] = true;
+                    addresses.push(this.allocPointer);
                     this.allocPointer++;
-                    remainingAdd--;
+                    if (addresses.length > 1) {
+                        // addresses are not next to eachother
+                        if (addresses[addresses.length - 1] - addresses[addresses.length - 2] !== 1) {
+                            remainingAdd = size * this.mem[type].BYTES_PER_ELEMENT;
+                            addresses = [];
+                        } else {
+                            remainingAdd--;
+                        }
+                    } else {
+                        remainingAdd--;
+                    }
+                    
                 } else {
                     this.allocPointer++;
-                    tryAlloc();
+                    numTries % 1000 === 0 ? setTimeout(tryAlloc, 0) : tryAlloc(); // fix maximum call stack error
                 }
             }
             tryAlloc();
-
         }
-        return addresses;
+
+        addresses.forEach(a => { this.allocList[a] = true });
+
+        return addresses.filter(a => a % this.mem[type].BYTES_PER_ELEMENT === 0);
     }
 
-    public free(addr: number[]): this {
+    public free(addr: number[], type: 1|2|4|40|80 = 40): this {
         addr.forEach((a) => {
-            this.allocList[a / this.b] = false;
-            this.m[a / this.b] = 0;
+            this.mem[type][a / this.mem[type].BYTES_PER_ELEMENT] = 0;
         })
+
+        let start = addr[0];
+        const end = addr[addr.length - 1] + this.mem[type].BYTES_PER_ELEMENT;
+
+        while (start < end) {
+            this.allocList[start] = false;
+            start++;
+        }
+        
         return this;
     }
 }

@@ -58,6 +58,8 @@ function buildModule(wasmArray, memoryJS) {
 				let tempDoublePtr = STATICTOP; STATICTOP += 16;
 				let DYNAMICTOP_PTR = staticAlloc(4);
 
+				const asmMEM = new ASM_Memory(mem.buffer);
+
 				WebAssembly.instantiateStreaming(
 						new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {
 							headers: {
@@ -69,6 +71,17 @@ function buildModule(wasmArray, memoryJS) {
 									return Date.now();
 								},
 								'___setErrNo': noop,
+								'_console': (n) => console.log(n),
+								'_mallocjs': (len, type) => asmMEM.malloc(len, type || 40)[0],
+								'_freejs': (start, len, type) => {
+									type = type || 40;
+									let bytes = type > 4 ? Math.round(type / 10) : type;
+									let arr = [];
+									for (let i = 0; i < len; i++) {
+										arr.push(start + (i * bytes));
+									}
+									asmMEM.free(arr, type);
+								},
 								'enlargeMemory': noop,
 								'getTotalMemory': () => TOTAL_MEMORY,
 								'abortOnCannotGrowMemory': noop,
@@ -96,7 +109,7 @@ function buildModule(wasmArray, memoryJS) {
 								return prev;
 							}, {}),
 							memory: mem.buffer,
-							memoryManager: new ASM_Memory(mem.buffer),
+							memoryManager: asmMEM,
 							table: table
 						});
 					}).catch(rej);

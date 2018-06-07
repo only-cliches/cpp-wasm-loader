@@ -10,7 +10,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "cpp-min-wasm-loader": "git+https://github.com/ClickSimply/cpp-wasm-loader.git",
+    "cpp-min-wasm-loader": "^0.6.1",
     "webpack": "^4.9.1",
     "webpack-cli": "^2.1.4",
     "webpack-dev-server": "^3.1.4"
