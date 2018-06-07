@@ -24,10 +24,11 @@ const writeFile = _bluebird2.default.promisify(fs.writeFile);
 const execFile = _bluebird2.default.promisify(cp.execFile);
 const rf = _bluebird2.default.promisify(rimraf);
 
-function buildModule(wasmArray) {
+function buildModule(wasmArray, memoryJS) {
 
 	return `module.exports = {
 		init: (adjustEnv) => {
+			${memoryJS}
 			adjustEnv = adjustEnv || function(obj) { return obj};
 			return new Promise((res, rej) => {
 				if (typeof WebAssembly === "undefined") {
@@ -45,7 +46,18 @@ function buildModule(wasmArray) {
 					'maximum': 10,
 					'element': 'anyfunc'
 				});
-				const noop = () => {};
+				const noop = (v) => v;
+
+				const staticAlloc = (size) => {
+					let ret = STATICTOP;
+					STATICTOP = (STATICTOP + size + 15) & -16;
+					return ret;
+				}
+
+				let STATICTOP = 2752;
+				let tempDoublePtr = STATICTOP; STATICTOP += 16;
+				let DYNAMICTOP_PTR = staticAlloc(4);
+
 				WebAssembly.instantiateStreaming(
 						new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {
 							headers: {
@@ -53,11 +65,16 @@ function buildModule(wasmArray) {
 							}
 						}), {
 							env: adjustEnv({
-								'_time': (ptr) => Date.now(),
+								'_time': (ptr) => {
+									return Date.now();
+								},
+								'___setErrNo': noop,
 								'enlargeMemory': noop,
 								'getTotalMemory': () => TOTAL_MEMORY,
 								'abortOnCannotGrowMemory': noop,
 								'abortStackOverflow': noop,
+								'DYNAMICTOP_PTR': DYNAMICTOP_PTR,
+								'tempDoublePtr': tempDoublePtr,
 								'abort': (err) => {
 									throw new Error(err)
 								},
@@ -79,6 +96,7 @@ function buildModule(wasmArray) {
 								return prev;
 							}, {}),
 							memory: mem.buffer,
+							memoryManager: new ASM_Memory(mem.buffer),
 							table: table
 						});
 					}).catch(rej);
@@ -121,12 +139,14 @@ exports.default = async function loader(content) {
 		const wasmFile = wasmBuildName;
 		const wasmContent = await readFile(path.join(folder, wasmFile));
 
-		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
+		const memoryModule = await readFile(path.join(__dirname, "mem.js"));
+
+		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)), memoryModule);
 
 		if (options.emitWasm) {
 			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm", wasmContent);
 		}
-		
+
 		if (folder !== null) {
 			await rf(folder);
 		}
