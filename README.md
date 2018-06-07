@@ -203,7 +203,11 @@ This isn't as difficult as it sounds, if you inilitize a variable inside a funct
 
 To make this process easy, C/C++ provides an abstraction called pointers.  Pointers are just the memory address for a specific variable.  In most cases it's much better and more efficient to provide addresses/pointers to a function in C rather than the variables themselves.  We end up having to do much less work since values don't need to be copied around in memory.
 
-But where do we get pointers?  We have to allocate a new memory slot for each variable we want, and when we perform that allocation we get a new pointer for each memory slot.  
+But where do we get pointers?  We have to allocate a new memory slot for each variable we want with `malloc`, and when we perform that allocation we get a new pointer for each memory slot.  
+
+The problem is there are only a limited number of slots, around 1 million with this library.  Once you use them all up, you're out of memory.
+
+So to keep that from happening we want to use pointers whenever possible (so we're not creating copies of the same variable everywhere, but references to that variable), and when we're done with a variable we'll free up it's address with `free`. 
 
 Let's see this in practice:
 ```js
@@ -220,8 +224,13 @@ wasm.init().then((module) => {
 
 	// get the value of the variable at addr[0]
 	console.log(memory.get(addr[0])) // 500;
+	
+	// free up this memory
+	memory.free(addr);
 });
 ```
+
+So why not just do javascript variables?  The advantage of using the memory class is we're creating values/variables that can be accessed and modified from javascript *and* WebAssembly/C.  So we can use Javascript to inilitize the values and save the address/pointers to a javascript class, then pass the pointers into C functions when we need to perform expensive calculations.
 
 ## License
 MIT
