@@ -97,7 +97,10 @@ exports.default = async function loader(content) {
 
 		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
 
-		this.emitFile("build.wasm", wasmContent);
+		if (options.emitWasm) {
+			this.emitFile("build.wasm", wasmContent);
+		}
+		
 
 		if (folder !== null) {
 			await rf(folder);
