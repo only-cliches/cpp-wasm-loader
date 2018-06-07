@@ -1,5 +1,5 @@
 {
-  "name": "cpp-wasm-loader",
+  "name": "cpp-min-wasm-loader",
   "description": "Webpack loader that transforms C/C++ source files directly into WASM module objects using Emscripten",
   "author": "Jakub Beránek, Scott Lott",
   "license": "MIT",
