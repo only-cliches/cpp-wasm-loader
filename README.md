@@ -81,7 +81,7 @@ const wasm = require("./add.c");
 wasm.init().then((module) => {
 	const memory = module.memoryManager;
 
-	// get 20 available addresses, each address is for 4 bytes.
+	// get 20 available addresses.
 	const addr = memory.malloc(20); 
 
 	// set the first address to 50
