@@ -2,17 +2,6 @@
 
 const _options = require('./options');
 
-function _toConsumableArray(arr) {
-	if (Array.isArray(arr)) {
-		let arr2 = Array(arr.length);
-		for (let i = 0; i < arr.length; i++) {
-			arr2[i] = arr[i];
-		}
-		return arr2;
-	} else {
-		return Array.from(arr);
-	}
-}
 
 function _interopRequireDefault(obj) {
 	return obj && obj.__esModule ? obj : {
@@ -38,25 +27,34 @@ const rf = _bluebird2.default.promisify(rimraf);
 function buildModule(wasmArray) {
 
 	return `module.exports = {
-		init: () => {
+		init: (adjustEnv) => {
+			adjustEnv = adjustEnv || function(obj) { return obj};
 			return new Promise((res, rej) => {
-				const mem = new WebAssembly.Memory({initial: 256, maximum: 256});
+				const WASM_PAGE_SIZE = 65536;
+				const TOTAL_MEMORY = 16777216;
+				const mem = new WebAssembly.Memory({ 'initial': TOTAL_MEMORY / WASM_PAGE_SIZE, 'maximum': TOTAL_MEMORY / WASM_PAGE_SIZE });
+				const table = new WebAssembly.Table({ 'initial': 10, 'maximum': 10, 'element': 'anyfunc' });
 				WebAssembly.instantiateStreaming(
 					new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {headers: {"content-type":"application/wasm"}}), 
 					{
-						env: {
+						env: adjustEnv({
+							'abort': (err) => { throw new Error(err) },
 							'abortStackOverflow': _ => { throw new Error('overflow'); },
-							'table': new WebAssembly.Table({initial: 0, maximum: 0, element: 'anyfunc'}),
-							'tableBase': 0,
 							'memory': mem,
 							'memoryBase': 1024,
+							'table': table,
+							'tableBase': 0,
 							'STACKTOP': 0,
 							'STACK_MAX': mem.buffer.byteLength,
-						}
+						})
 					}
 				)
 				.then(e => {
-					res(e.instance.exports);
+					res({
+						exports: e.instance.exports,
+						memory: mem.buffer,
+						table: table
+					});
 				}).catch(rej);
 			});
 		}
@@ -79,7 +77,10 @@ exports.default = async function loader(content) {
 		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
 		const indexFile = wasmBuildName.replace('.wasm', '.js');
 
-		options.emccFlags = [inputFile, '-s', 'WASM=1'].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
+		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
+
+		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
+		options.emccFlags = options.emccFlags ? options.emccFlags(defaultFlags) : defaultFlags;
 
 		folder = await tmpDir();
 
@@ -95,6 +96,8 @@ exports.default = async function loader(content) {
 		const wasmContent = await readFile(path.join(folder, wasmFile));
 
 		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)));
+
+		this.emitFile("build.wasm", wasmContent);
 
 		if (folder !== null) {
 			await rf(folder);
