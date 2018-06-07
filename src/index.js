@@ -80,7 +80,7 @@ exports.default = async function loader(content) {
 		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
 		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
-		options.emccFlags = options.emccFlags ? options.emccFlags(defaultFlags) : defaultFlags;
+		options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
 
 		folder = await tmpDir();
 
