@@ -70,7 +70,9 @@ wasm.init().then((module) => {
 ## Using The Memory Manager Class
 The memory management class is only useful for handling 32 bit floating point variables.  Every variable allocated by the memory manager class will be a 32 bit floating point number.
 
-It can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++;
+The class can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++;
+
+If you're unfamiliar with pointers/memory management jump to [this](#pointers-and-whatnot) part of the readme.
 
 Memory can only be allocated or freed up with the javascript API.  Values can be read or adjusted by C/C++ or Javascript using the provided memory addresses.
 
@@ -192,6 +194,33 @@ wasm.init((importENV) => {
 	// make any changes to importENV as needed;
 	return importENV;
 }).then....
+```
+
+## Pointers and Whatnot
+WebAssembly shares a major limitation with many other low level languages: some memory must be managed by hand.
+
+This isn't as difficult as it sounds, if you inilitize a variable inside a function in C/WebAssembly those are still cleaned up automatically.  We only need to concern ourselves with variables that are intended to stick around and be used across many functions.
+
+To make this process easy, C/C++ provides an abstraction called pointers.  Pointers are just the memory address for a specific variable.  In most cases it's much better and more efficient to provide addresses/pointers to a function in C rather than the variables themselves.  We end up having to do much less work since values don't need to be copied around in memory.
+
+But where do we get pointers?  We have to allocate a new memory slot for each variable we want, and when we perform that allocation we get a new pointer for each memory slot.  
+
+Let's see this in practice:
+```js
+const wasm = require("./manager.c");
+wasm.init().then((module) => {
+	const memory = module.memoryManager;
+
+	// get one slot in memory
+	const addr = memory.malloc(1);
+	console.log("New Memory Addresses: " + addr); // [0]
+
+	// adjust the value of that variable to equal 500;
+	memory.set(addr[0], 500);
+
+	// get the value of the variable at addr[0]
+	console.log(memory.get(addr[0])) // 500;
+});
 ```
 
 ## License

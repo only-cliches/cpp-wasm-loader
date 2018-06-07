@@ -6,7 +6,7 @@ class ASM_Memory {
 
     public allocPointer: number;
 
-    private b: number;
+    public b: number;
 
     private max: number;
 
