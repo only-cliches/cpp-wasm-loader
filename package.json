@@ -8,6 +8,8 @@
     "wasm",
     "webpack",
     "loader",
+    "webassembly",
+    "emscripten",
     "c",
     "c++"
   ],

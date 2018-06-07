@@ -12,7 +12,7 @@ module.exports = {
         umdNamedDefine: true
     },
     resolve: {
-        extensions: ['.js', ".c"]
+        extensions: ['.js', ".c", ".cpp"]
     },
     module: {
         rules: [
