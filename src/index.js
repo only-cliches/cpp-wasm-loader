@@ -30,32 +30,58 @@ function buildModule(wasmArray) {
 		init: (adjustEnv) => {
 			adjustEnv = adjustEnv || function(obj) { return obj};
 			return new Promise((res, rej) => {
+				if (typeof WebAssembly === "undefined") {
+					rej("No Webassembly support!");
+					return;
+				}
 				const WASM_PAGE_SIZE = 65536;
 				const TOTAL_MEMORY = 16777216;
-				const mem = new WebAssembly.Memory({ 'initial': TOTAL_MEMORY / WASM_PAGE_SIZE, 'maximum': TOTAL_MEMORY / WASM_PAGE_SIZE });
-				const table = new WebAssembly.Table({ 'initial': 10, 'maximum': 10, 'element': 'anyfunc' });
+				const mem = new WebAssembly.Memory({
+					'initial': TOTAL_MEMORY / WASM_PAGE_SIZE,
+					'maximum': TOTAL_MEMORY / WASM_PAGE_SIZE
+				});
+				const table = new WebAssembly.Table({
+					'initial': 10,
+					'maximum': 10,
+					'element': 'anyfunc'
+				});
+				const noop = () => {};
 				WebAssembly.instantiateStreaming(
-					new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {headers: {"content-type":"application/wasm"}}), 
-					{
-						env: adjustEnv({
-							'abort': (err) => { throw new Error(err) },
-							'abortStackOverflow': _ => { throw new Error('overflow'); },
-							'memory': mem,
-							'memoryBase': 1024,
-							'table': table,
-							'tableBase': 0,
-							'STACKTOP': 0,
-							'STACK_MAX': mem.buffer.byteLength,
-						})
-					}
-				)
-				.then(e => {
-					res({
-						exports: e.instance.exports,
-						memory: mem.buffer,
-						table: table
-					});
-				}).catch(rej);
+						new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {
+							headers: {
+								"content-type": "application/wasm"
+							}
+						}), {
+							env: adjustEnv({
+								'_time': (ptr) => Date.now(),
+								'enlargeMemory': noop,
+								'getTotalMemory': () => TOTAL_MEMORY,
+								'abortOnCannotGrowMemory': noop,
+								'abortStackOverflow': noop,
+								'abort': (err) => {
+									throw new Error(err)
+								},
+								'abortStackOverflow': _ => {
+									throw new Error('overflow');
+								},
+								'memory': mem,
+								'memoryBase': 1024,
+								'table': table,
+								'tableBase': 0,
+								'STACKTOP': 0,
+								'STACK_MAX': mem.buffer.byteLength,
+							})
+						}
+					).then(e => {
+						res({
+							exports: Object.keys(e.instance.exports).reduce((prev, cur) => {
+								prev[cur.replace("_", "")] = e.instance.exports[cur];
+								return prev;
+							}, {}),
+							memory: mem.buffer,
+							table: table
+						});
+					}).catch(rej);
 			});
 		}
 	}`;
