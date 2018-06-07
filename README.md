@@ -20,7 +20,7 @@ Load C/C++ source files directly into javascript with a zero bloat.
 {
 	test: /\.(c|cpp)$/,
 	use: {
-		loader: 'cpp-wasm-loader'
+		loader: 'cpp-min-wasm-loader'
 	}
 }
 ```
