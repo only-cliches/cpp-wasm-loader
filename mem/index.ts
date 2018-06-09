@@ -1,3 +1,12 @@
+/// <reference path="webassembly.d.ts" />
+
+interface ASM_Module {
+    exports: {[key: string]: any},
+    memory: WebAssembly.Memory,
+    memoryManager: ASM_Memory,
+    table: WebAssembly.Table
+}
+
 class ASM_Memory {
 
     //public m: Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array | Float64Array;
@@ -44,13 +53,19 @@ class ASM_Memory {
         this.max = buffer.byteLength - 1;
     }
 
-    public set(addr: number, value: number, type: 1|2|4|40|80 = 40) {
+    public set(addr: number, value: number, type: 1|2|4|40|80 = 40): this {
         this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT] = value;
         return this;
     }
 
     public get(addr: number, type: 1|2|4|40|80 = 40): number {
         return this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT];
+    }
+
+    public avail(t: 1|2|4|40|80 = 40): number {
+        const totalBytes = (this.allocList.filter(l => l).length - this.mem.char.byteLength);
+        let bytes = (t > 4 ? t / 10 : t) as number;
+        return totalBytes / bytes;
     }
 
     public malloc(size: number, type: 1|2|4|40|80 = 40): number[] {
@@ -78,7 +93,7 @@ class ASM_Memory {
                     addresses.push(this.allocPointer);
                     this.allocPointer++;
                     if (addresses.length > 1) {
-                        // addresses are not next to eachother
+                        // addresses are not contiguious
                         if (addresses[addresses.length - 1] - addresses[addresses.length - 2] !== 1) {
                             remainingAdd = size * this.mem[type].BYTES_PER_ELEMENT;
                             addresses = [];

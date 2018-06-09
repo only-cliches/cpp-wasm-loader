@@ -108,7 +108,7 @@ function buildModule(wasmArray, memoryJS) {
 								prev[cur.replace("_", "")] = e.instance.exports[cur];
 								return prev;
 							}, {}),
-							memory: mem.buffer,
+							memory: mem,
 							memoryManager: asmMEM,
 							table: table
 						});
@@ -136,7 +136,7 @@ exports.default = async function loader(content) {
 
 		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
-		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-s", "ALLOW_MEMORY_GROWTH=1", "-Os"];
+		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
 		options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
 
 		folder = await tmpDir();
