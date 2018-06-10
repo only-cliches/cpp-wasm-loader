@@ -62,10 +62,13 @@ class ASM_Memory {
         return this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT];
     }
 
-    public avail(t: 1|2|4|40|80 = 40): number {
+    public getRange(addr: number, len: number, type: 1|2|4|40|80 = 40): Int8Array|Int16Array|Int32Array|Float32Array|Float64Array {
+        return this.mem[type].slice(addr, addr + (len * this.mem[type].BYTES_PER_ELEMENT));
+    }
+
+    public avail(type: 1|2|4|40|80 = 40): number {
         const totalBytes = (this.allocList.filter(l => l).length - this.mem.char.byteLength);
-        let bytes = (t > 4 ? t / 10 : t) as number;
-        return totalBytes / bytes;
+        return totalBytes / this.mem[type].BYTES_PER_ELEMENT;
     }
 
     public malloc(size: number, type: 1|2|4|40|80 = 40): number[] {

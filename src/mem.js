@@ -31,11 +31,14 @@ var ASM_Memory = (function () {
         if (type === void 0) { type = 40; }
         return this.mem[type][addr / this.mem[type].BYTES_PER_ELEMENT];
     };
-    ASM_Memory.prototype.avail = function (t) {
-        if (t === void 0) { t = 40; }
+    ASM_Memory.prototype.getRange = function (addr, len, type) {
+        if (type === void 0) { type = 40; }
+        return this.mem[type].slice(addr, addr + (len * this.mem[type].BYTES_PER_ELEMENT));
+    };
+    ASM_Memory.prototype.avail = function (type) {
+        if (type === void 0) { type = 40; }
         var totalBytes = (this.allocList.filter(function (l) { return l; }).length - this.mem.char.byteLength);
-        var bytes = (t > 4 ? t / 10 : t);
-        return totalBytes / bytes;
+        return totalBytes / this.mem[type].BYTES_PER_ELEMENT;
     };
     ASM_Memory.prototype.malloc = function (size, type) {
         var _this = this;

@@ -67,7 +67,7 @@ wasm.init((imports) => {
 	return imports;
 }).then((module) => {
 	console.log(module.exports.add(1, 2)); // 3
-	console.log(module.memory) // WebAssembly Memory Buffer object
+	console.log(module.memory) // WebAssembly Memory object
 	console.log(module.memoryManager) // Memory Manager Class
 }).catch((err) => {
 	console.error(err);

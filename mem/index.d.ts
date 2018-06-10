@@ -26,7 +26,8 @@ declare class ASM_Memory {
     constructor(buffer: ArrayBuffer);
     set(addr: number, value: number, type?: 1 | 2 | 4 | 40 | 80): this;
     get(addr: number, type?: 1 | 2 | 4 | 40 | 80): number;
-    avail(t?: 1 | 2 | 4 | 40 | 80): number;
+    getRange(addr: number, len: number, type?: 1 | 2 | 4 | 40 | 80): Int8Array | Int16Array | Int32Array | Float32Array | Float64Array;
+    avail(type?: 1 | 2 | 4 | 40 | 80): number;
     malloc(size: number, type?: 1 | 2 | 4 | 40 | 80): number[];
     free(addr: number[], type?: 1 | 2 | 4 | 40 | 80): this;
 }
