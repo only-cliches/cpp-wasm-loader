@@ -53,16 +53,12 @@ export default async function loader(content) {
 
     const wasmBuildName = createBuildWasmName(this.resourcePath, content);
 
-    const inputFile = `input${path.extname(this.resourcePath)}`;
     const indexFile = wasmBuildName.replace('.wasm', '.js');
     const wasmFile = wasmBuildName;
 
-    options.emccFlags = [inputFile, '-s', 'WASM=1', ...options.emccFlags, '-o', indexFile];
+    options.emccFlags = [this.resourcePath, '-s', 'WASM=1', ...options.emccFlags, '-o', indexFile];
 
     folder = await tmpDir();
-
-    // write source to tmp directory
-    await writeFile(path.join(folder, inputFile), content);
 
     // compile source file to WASM
     await execFile(options.emccPath, options.emccFlags, {
