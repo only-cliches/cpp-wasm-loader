@@ -1,61 +1,37 @@
 {
-  "name": "cpp-wasm-loader",
-  "description": "Webpack loader that transforms C/C++ source files directly into WASM module objects using Emscripten",
-  "author": "Jakub Beránek",
+  "name": "cpp-min-wasm-loader",
+  "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
+  "author": "Jakub Beránek, Scott Lott",
   "license": "MIT",
-  "version": "0.1.3",
+  "version": "0.7.0",
   "keywords": [
     "wasm",
     "webpack",
     "loader",
+    "webassembly",
+    "asmjs",
+    "memory",
+    "emscripten",
     "c",
     "c++"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/kobzol/cpp-wasm-loader.git"
+    "url": "https://github.com/ClickSimply/cpp-min-wasm-loader.git"
   },
-  "main": "dist/cjs.js",
+  "main": "src/cjs.js",
   "scripts": {
-    "webpack-defaults": "webpack-defaults",
-    "start": "npm run build -- -w",
-    "build": "cross-env NODE_ENV=production babel src -d dist --ignore 'src/**/*.test.js'",
-    "clean": "del-cli dist",
-    "lint": "eslint --cache src test",
-    "prepublish": "npm run build",
-    "test": "jest",
-    "webpack": "webpack"
+    "build": "tsc -p tsconfig.json && mv mem/index.js src/mem.js"
   },
   "dependencies": {
-    "bluebird": "^3.5.0",
-    "tmp": "^0.0.33",
-    "loader-utils": "^1.1.0",
     "md5": "^2.2.1",
-    "rimraf": "^2.6.2"
+    "rimraf": "^2.6.2",
+    "tmp": "^0.0.33",
+    "typescript": "^2.9.1"
   },
-  "devDependencies": {
-    "babel-cli": "^6.26.0",
-    "babel-jest": "^20.0.3",
-    "babel-plugin-transform-object-rest-spread": "^6.23.0",
-    "babel-polyfill": "^6.23.0",
-    "babel-preset-env": "^1.6.0",
-    "cross-env": "^5.0.5",
-    "del-cli": "^1.1.0",
-    "eslint": "^4.4.1",
-    "eslint-config-webpack": "^1.2.5",
-    "eslint-plugin-import": "^2.7.0",
-    "jest": "^20.0.4",
-    "lint-staged": "^4.0.3",
-    "loader-runner": "^2.3.0",
-    "memory-fs": "^0.4.1",
-    "nsp": "^2.7.0",
-    "pre-commit": "^1.2.2",
-    "standard-version": "^4.2.0",
-    "webpack": "^3.5.4",
-    "webpack-defaults": "^1.5.0"
-  },
+  "devDependencies": {},
   "files": [
-    "dist"
+    "src"
   ],
   "engines": {
     "node": ">= 4.3 < 5.0.0 || >= 5.10"

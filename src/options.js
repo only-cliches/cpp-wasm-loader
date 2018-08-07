@@ -1,14 +1,15 @@
-const loaderUtils = require('loader-utils');
+'use strict';
 
-export function loadOptions(loader)
-{
-  const options = loaderUtils.getOptions(loader);
 
-  const emccPath = options.emccPath ? options.emccPath : (process.platform === 'win32' ? 'em++.bat' : 'em++');
-  const emccFlags = options.emccFlags ? options.emccFlags : ['-O3'];
-  const publicPath = options.publicPath ? options.publicPath : '';
+exports.loadOptions = loadOptions;
+var loaderUtils = require('loader-utils');
+
+function loadOptions(loader) {
+  var options = loaderUtils.getOptions(loader);
+
+  var emccPath = options.emccPath ? options.emccPath : process.platform === 'win32' ? 'em++.bat' : 'em++';
 
   return {
-    emccPath, emccFlags, publicPath
+    emccPath, emccFlags: options.emccFlags, emitWasm: options.emitWasm
   };
 }
