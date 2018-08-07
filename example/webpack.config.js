@@ -19,7 +19,7 @@ module.exports = {
             {
                 test: /\.(c|cpp)$/,
                 use: {
-                    loader: 'cpp-min-wasm-loader',
+                    loader: 'cpp-wasm-loader',
                     options: {
                         // emitWasm: true, // emit WASM file built by emscripten to the build folder
                         // emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
