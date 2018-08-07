@@ -137,8 +137,12 @@ exports.default = async function loader(content) {
 		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
 
 		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
-		options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
-
+		if (options.emccFlags && typeof options.emccFlags === "function") {
+			options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
+		} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
+			options.emccFlags = defaultFlags.concat(options.emccFlags);
+		}
+		
 		folder = await tmpDir();
 
 		// write source to tmp directory

@@ -1,45 +1,45 @@
 {
-  "name": "cpp-min-wasm-loader",
-  "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
-  "author": "Jakub Beránek, Scott Lott",
-  "license": "MIT",
-  "version": "0.7.0",
-  "keywords": [
-    "wasm",
-    "webpack",
-    "loader",
-    "webassembly",
-    "asmjs",
-    "memory",
-    "emscripten",
-    "c",
-    "c++"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ClickSimply/cpp-min-wasm-loader.git"
-  },
-  "main": "src/cjs.js",
-  "scripts": {
-    "build": "tsc -p tsconfig.json && mv mem/index.js src/mem.js"
-  },
-  "dependencies": {
-    "md5": "^2.2.1",
-    "rimraf": "^2.6.2",
-    "tmp": "^0.0.33",
-    "typescript": "^2.9.1"
-  },
-  "devDependencies": {},
-  "files": [
-    "src"
-  ],
-  "engines": {
-    "node": ">= 4.3 < 5.0.0 || >= 5.10"
-  },
-  "peerDependencies": {
-    "webpack": "^2.0.0 || ^3.0.0"
-  },
-  "browser": {
-    "fs": false
-  }
+    "name": "cpp-wasm-loader",
+    "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
+    "author": "Jakub Beránek, Scott Lott",
+    "license": "MIT",
+    "version": "0.7.0",
+    "keywords": [
+        "wasm",
+        "webpack",
+        "loader",
+        "webassembly",
+        "asmjs",
+        "memory",
+        "emscripten",
+        "c",
+        "c++"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ClickSimply/cpp-wasm-loader.git"
+    },
+    "main": "src/cjs.js",
+    "scripts": {
+        "build": "tsc -p tsconfig.json && mv mem/index.js src/mem.js"
+    },
+    "dependencies": {
+        "md5": "^2.2.1",
+        "rimraf": "^2.6.2",
+        "tmp": "^0.0.33",
+        "typescript": "^2.9.1"
+    },
+    "devDependencies": {},
+    "files": [
+        "src"
+    ],
+    "engines": {
+        "node": ">= 4.3 < 5.0.0 || >= 5.10"
+    },
+    "peerDependencies": {
+        "webpack": "^2.0.0 || ^3.0.0"
+    },
+    "browser": {
+        "fs": false
+    }
 }
