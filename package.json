@@ -3,7 +3,7 @@
     "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
     "author": "Jakub Beránek, Scott Lott",
     "license": "MIT",
-    "version": "0.7.1",
+    "version": "0.7.2",
     "keywords": [
         "wasm",
         "webpack",
@@ -24,12 +24,15 @@
         "build": "tsc -p tsconfig.json && mv mem/index.js src/mem.js"
     },
     "dependencies": {
+        "bluebird": "^3.5.1",
+        "loader-utils": "^1.1.0",
         "md5": "^2.2.1",
         "rimraf": "^2.6.2",
-        "tmp": "^0.0.33",
+        "tmp": "^0.0.33"
+    },
+    "devDependencies": {
         "typescript": "^2.9.1"
     },
-    "devDependencies": {},
     "files": [
         "src"
     ],

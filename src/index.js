@@ -24,7 +24,7 @@ const writeFile = _bluebird2.default.promisify(fs.writeFile);
 const execFile = _bluebird2.default.promisify(cp.execFile);
 const rf = _bluebird2.default.promisify(rimraf);
 
-function buildModule(wasmArray, memoryJS) {
+function buildModule(publicPath, wasmArray, memoryJS) {
 
 	return `module.exports = {
 		init: (adjustEnv) => {
@@ -110,7 +110,8 @@ function buildModule(wasmArray, memoryJS) {
 							}, {}),
 							memory: mem,
 							memoryManager: asmMEM,
-							table: table
+							table: table,
+							locateFile: function(name) { return ${JSON.stringify(publicPath)} + name; }
 						});
 					}).catch(rej);
 			});
@@ -130,17 +131,19 @@ exports.default = async function loader(content) {
 	try {
 		const options = (0, _options.loadOptions)(this);
 
+
 		const inputFile = `input${path.extname(this.resourcePath)}`;
 		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
 		const indexFile = wasmBuildName.replace('.wasm', '.js');
 
-		// options.emccFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"].concat(_toConsumableArray(options.emccFlags), ['-o', indexFile]);
+		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", this.minimize ? "-Os" : "-O1"];
 
-		const defaultFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", "-Os"];
 		if (options.emccFlags && typeof options.emccFlags === "function") {
 			options.emccFlags = options.emccFlags && typeof options.emccFlags === "function" ? options.emccFlags(defaultFlags) : defaultFlags;
 		} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
 			options.emccFlags = defaultFlags.concat(options.emccFlags);
+		} else {
+			options.emccFlags = defaultFlags;
 		}
 		
 		folder = await tmpDir();
@@ -158,7 +161,7 @@ exports.default = async function loader(content) {
 
 		const memoryModule = await readFile(path.join(__dirname, "mem.js"));
 
-		const module = buildModule(wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)), memoryModule);
+		const module = buildModule(options.publicPath, wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)), memoryModule);
 
 		if (options.emitWasm) {
 			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm", wasmContent);

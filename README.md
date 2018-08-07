@@ -1,11 +1,11 @@
-# Minimal CPP to WASM Webpack Loader
+# CPP to WASM Webpack Loader
 
 <div>
 <a title="By Carlos Baraza [CC0], via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File%3AWeb_Assembly_Logo.svg"><img height="128" alt="Web Assembly Logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Web_Assembly_Logo.svg/512px-Web_Assembly_Logo.svg.png"/></a>
 <a title="By Jeremy Kratz (https://github.com/isocpp/logos) [Copyrighted free use], via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File%3AISO_C%2B%2B_Logo.svg"><img height="128" alt="ISO C++ Logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/ISO_C%2B%2B_Logo.svg/256px-ISO_C%2B%2B_Logo.svg.png"/></a>
 </div>
 
-[![NPM](https://nodei.co/npm/cpp-min-wasm-loader.png?downloads=true&stars=true)](https://nodei.co/npm/cpp-wasm-loader/)
+[![NPM](https://nodei.co/npm/cpp-wasm-loader.png?downloads=true&stars=true)](https://nodei.co/npm/cpp-wasm-loader/)
 
 Load C/C++ source files directly into javascript with a zero bloat.
 
@@ -32,6 +32,23 @@ Load C/C++ source files directly into javascript with a zero bloat.
 ```js
 resolve: {
 	extensions: ['.js', ".c", ".cpp"]
+}
+```
+
+## Webpack Options
+The webpack loader has several options:
+```js
+{
+	test: /\.(c|cpp)$/,
+	use: {
+		loader: 'cpp-wasm-loader',
+		options: {
+			// emitWasm: true, // emit WASM file built by emscripten to the build folder
+			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
+			// emccPath: "path/to/emcc", // only needed if emcc is not in PATH,
+			// publicPath: Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config. 
+		}
+	}
 }
 ```
 
@@ -67,7 +84,7 @@ wasm.init((imports) => {
 	return imports;
 }).then((module) => {
 	console.log(module.exports.add(1, 2)); // 3
-	console.log(module.memory) // WebAssembly Memory object
+	console.log(module.memory) // Raw WebAssembly Memory object
 	console.log(module.memoryManager) // Memory Manager Class
 }).catch((err) => {
 	console.error(err);
@@ -75,7 +92,7 @@ wasm.init((imports) => {
 ```
 
 ## Using The Memory Manager Class
-The class can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++;
+The class can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++.  Using the memory manager class over `malloc` and `free` in C can save ~6KB.
 
 If you're unfamiliar with pointers/memory management jump to [this](#pointers-and-whatnot) part of the readme.
 
@@ -106,7 +123,7 @@ wasm.init().then((module) => {
 
 You can pass the addresses provided by the memory manager directly into C/C++ as pointers.
 
-The pointers are always referencing a `float` type.
+The pointers are always referencing a 4 byte `float` type.
 
 **manager.c**
 ```c
@@ -192,22 +209,6 @@ wasm.init().then((module) => {
 
 ## Advanced Usage / Tips
 
-### Webpack Options
-The webpack loader has several options:
-```js
-{
-	test: /\.(c|cpp)$/,
-	use: {
-		loader: 'cpp-wasm-loader',
-		options: {
-			// emitWasm: true, // emit WASM file built by emscripten to the build folder
-			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
-			// emccPath: "path/to/emcc", // only needed if emcc is not in PATH
-		}
-	}
-}
-```
-
 ### WebAssembly Memory
 The `module.memory` export is a buffer that holds memory that is shared between javascript and webassembly.  You can read about how to use it in these [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WebAssembly/Memory).
 
@@ -284,5 +285,12 @@ wasm.init().then((module) => {
 
 So why not just do javascript variables?  The advantage of using the memory class is we're creating values/variables that can be accessed and modified from javascript *and* WebAssembly/C.  So we can use Javascript to inilitize the values and save the address/pointers to a javascript class, then pass the pointers into C functions when we need to perform expensive calculations.
 
-## License
-MIT
+## MIT License
+
+Copyright 2018 Scott Lott & Jakub Beránek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
