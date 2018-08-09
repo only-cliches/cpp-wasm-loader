@@ -10,8 +10,9 @@
 Load C/C++ source files directly into javascript with a zero bloat.
 
 - Minimal execution environment, bundles start at only **1.2kb gzipped**.
-- No external files, compiled Webassembly is saved directly into the js bundle.
+- No external files required, compiled Webassembly is optionally embedded into the js bundle.
 - Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
+- Falls back to `WebAssembly.instantiate` if `WebAssembly.instantiateStreaming` isn't available.
 - Includes an optional memory manager class to easily handle `malloc` and `free` on the javascript side (saves ~6KB).
 - Adding custom javascript functions to call from C/C++ or vise versa is a breaze.
 
@@ -42,11 +43,12 @@ The webpack loader has several options:
 	use: {
 		loader: 'cpp-wasm-loader',
 		options: {
-			// emitWasm: Boolean, emit WASM file built by emscripten to the build folder
+			// emitWasm: Boolean, emit Wasm file built by emscripten to the build folder.  Wasm file is still embedded into javascript file as well.
 			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), add or modify compiler flags
 			// emccPath: String, "path/to/emcc", // only needed if emcc is not in PATH,
 			// publicPath: String, Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config.
 			// disableMemoryClass: Boolean, pass `true` to omit the memory manager class in the bundle. Saves ~1kb.
+			// externalWasm: Boolean, pass `true` to skip embedding the wasm file into your js files.  You'll need to ship the .wasm files along with your .js files if you use this option.
 		}
 	}
 }
@@ -79,7 +81,7 @@ extern "C"
 ```js
 const wasm = require("./add.c");
 wasm.init((imports) => {
-	// custom javascript function to be called from C;
+	// custom javascript function that can be called from C;
 	imports._sub = (a, b) => a - b;
 	return imports;
 }).then((module) => {
@@ -92,7 +94,7 @@ wasm.init((imports) => {
 ```
 
 ## Using The Memory Manager Class
-The class can provide a list of available memory addresses upon request.  Memory can be allocated and freed from either C/C++ or Javascript.  The memory addresses can then be used to set or access the value of the variable at that address in Javascript or C/C++.  Using the memory manager class over native `malloc` and `free` in C can save ~6KB.
+The class can provide a list of available memory addresses upon request.  Memory can be allocated and freed from either C/C++ or Javascript using the class.  The memory addresses can then be used to set or access the value of the variable at that address in Javascript or C/C++.  Using the memory manager class over native `malloc` and `free` in C can save ~6KB.
 
 When using `malloc` or `struct` addresses are gauranteed to be contiguous just like in C/C++.
 
@@ -143,7 +145,7 @@ wasm.init().then((module) => {
 })
 ```
 
-### Memory Manager Example
+### Memory Manager Detailed Example
 
 You can pass the addresses provided by the memory manager directly into C/C++ as pointers.
 
@@ -234,7 +236,7 @@ wasm.init().then((module) => {
 ## Advanced Usage / Tips
 
 ### WebAssembly Memory
-The `module.memory` export is a buffer that holds memory that is shared between javascript and webassembly.  You can read about how to use it in these [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WebAssembly/Memory).
+The `module.memory` export is a buffer that holds the raw memory object that is shared between javascript and webassembly.  You can read about how to use it in these [MDN docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WebAssembly/Memory).
 
 ### Calling JS Functions from C/C++
 It's pretty easy to setup JS functions to be called from within C/C++.  While it's technically possible to setup functions to use strings/charecters it's much easier to just stick to numbers.

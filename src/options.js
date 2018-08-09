@@ -16,6 +16,7 @@ function loadOptions(loader) {
     emccFlags: options.emccFlags, 
     emitWasm: options.emitWasm,
     publicPath,
-    disableMemoryClass
+    disableMemoryClass,
+    externalWasm: options.externalWasm
   };
 }

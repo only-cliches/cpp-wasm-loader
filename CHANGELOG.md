@@ -1,3 +1,8 @@
+# 0.7.6 - 8/9/2018
+- Added fallback to `instantiate` if `instantiateStreaming` isn't available.
+- Removed more code if `disableMemoryClass` is enabled.
+- Added `externalWasm` option to allow switching between embedding the wasm into javascript or delivering it separately.
+
 # 0.7.5 - 8/8/2018
 - Added `struct` ability to memory class.
 - Added `disableMemoryClass` option to webpack config.
