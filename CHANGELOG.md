@@ -1,3 +1,7 @@
+# 0.7.5 - 8/8/2018
+- Added `struct` ability to memory class.
+- Added `disableMemoryClass` option to webpack config.
+
 # 0.7.2 - 8/7/2018
 - Restored `publicPath` option.
 - Added MIT license text to README.

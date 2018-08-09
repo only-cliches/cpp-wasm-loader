@@ -21,9 +21,10 @@ module.exports = {
                 use: {
                     loader: 'cpp-wasm-loader',
                     options: {
-                        // emitWasm: true, // emit WASM file built by emscripten to the build folder
+                        emitWasm: true, // emit WASM file built by emscripten to the build folder
                         // emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
-                        // emccPath: "path/to/emcc", // only needed if emcc is not in PATH
+                        // emccPath: "path/to/emcc", // only needed if emcc is not in PATH,
+                        disableMemoryClass: true // disable javascript memory management class
                     }
                 }
             }

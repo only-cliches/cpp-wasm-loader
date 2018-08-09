@@ -9,12 +9,11 @@
 
 Load C/C++ source files directly into javascript with a zero bloat.
 
-- No external files, compiled webassembly is saved directly into the js bundle.
-- Super small builds with minimal execution environment, bundles start at only **1.5kb gzipped**.
+- Minimal execution environment, bundles start at only **1.2kb gzipped**.
+- No external files, compiled Webassembly is saved directly into the js bundle.
 - Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
-- Provides export for WebAssembly memory management and access.
-- Includes a small memory manager class to handle `malloc` and `free` on the javascript side (saves ~6KB).
-- Easily add custom javascript functions to call from C/C++ or vise versa.
+- Includes an optional memory manager class to easily handle `malloc` and `free` on the javascript side (saves ~6KB).
+- Adding custom javascript functions to call from C/C++ or vise versa is a breaze.
 
 ## Installation
 1. Install Emscripten following the instructions [here](https://kripken.github.io/emscripten-site/docs/getting_started/downloads.html).
@@ -43,10 +42,11 @@ The webpack loader has several options:
 	use: {
 		loader: 'cpp-wasm-loader',
 		options: {
-			// emitWasm: true, // emit WASM file built by emscripten to the build folder
-			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
-			// emccPath: "path/to/emcc", // only needed if emcc is not in PATH,
-			// publicPath: Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config. 
+			// emitWasm: Boolean, emit WASM file built by emscripten to the build folder
+			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), add or modify compiler flags
+			// emccPath: String, "path/to/emcc", // only needed if emcc is not in PATH,
+			// publicPath: String, Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config.
+			// disableMemoryClass: Boolean, pass `true` to omit the memory manager class in the bundle. Saves ~1kb.
 		}
 	}
 }
@@ -92,20 +92,20 @@ wasm.init((imports) => {
 ```
 
 ## Using The Memory Manager Class
-The class can provide a list of available memory addresses upon request.  The memory addresses can be used to set or access the value of that variable in javascript or C/C++.  Using the memory manager class over `malloc` and `free` in C can save ~6KB.
+The class can provide a list of available memory addresses upon request.  Memory can be allocated and freed from either C/C++ or Javascript.  The memory addresses can then be used to set or access the value of the variable at that address in Javascript or C/C++.  Using the memory manager class over native `malloc` and `free` in C can save ~6KB.
+
+When using `malloc` or `struct` addresses are gauranteed to be contiguous just like in C/C++.
 
 If you're unfamiliar with pointers/memory management jump to [this](#pointers-and-whatnot) part of the readme.
 
-Memory can be allocated through javascript or C/C++.  Values can be read or adjusted by C/C++ or Javascript using the provided memory addresses.
-
 ### Memory Manager API
-To access the memory manager you can grab it off the module object after webassembly has initialized:
+To access the memory manager you can grab it off the module object after Webassembly has initialized:
 ```js
 const wasm = require("./add.c");
 wasm.init().then((module) => {
 	const memory = module.memoryManager;
 
-	// get 20 available addresses.
+	// get a block of 20 available addresses.
 	const addr = memory.malloc(20); 
 
 	// set the first address to 50
@@ -116,6 +116,30 @@ wasm.init().then((module) => {
 
 	// free up all the addresses for later use
 	memory.free(addr);
+
+	// assign object to memory addresses
+	const obj = memory.struct([
+		"key", 100,
+		"prop", 20,
+		"nested", [
+			"value", 10
+		]
+	]);
+
+	
+	console.log(memory.get(obj.key)) // 100
+	console.log(memory.get(obj.prop)) // 20
+	console.log(memory.get(obj.nested.value)) // 10
+
+	// special properties
+	console.log(obj._length) // 3, number of addresses (only first level)
+	console.log(obj._totalLength) // 5, number of addresses (including all nested objects)
+	console.log(obj._addr) // starting address
+	console.log(obj._keys) // ["key", "prop", "nested"], array of keys (in address order)
+	console.log(obj.nested._length) // 2, nested objects have an additional property "_up" in the first address slot which includes the parent slot address
+
+	// free all memory used by object
+	memory.free(obj);
 })
 ```
 
@@ -133,7 +157,7 @@ extern "C"
 {
 	/* Functions provided by Memory API */
 	extern double mallocjs(int len);
-    extern void freejs(int start, int len);
+	extern void freejs(int start, int len);
 
 	EMSCRIPTEN_KEEPALIVE /* Allocate memory, returns only the first memory address */
 	double doMalloc(int len) {

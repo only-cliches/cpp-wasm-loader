@@ -1,4 +1,5 @@
 /// <reference path="webassembly.d.ts" />
+declare const Promise: any;
 interface ASM_Module {
     exports: {
         [key: string]: any;
@@ -6,6 +7,14 @@ interface ASM_Module {
     memory: WebAssembly.Memory;
     memoryManager: ASM_Memory;
     table: WebAssembly.Table;
+}
+interface MemoryObj {
+    _addr: number;
+    _keys: string[];
+    _up: number;
+    _length: number;
+    _totalLength: number;
+    [key: string]: any;
 }
 declare class ASM_Memory {
     mem: {
@@ -26,8 +35,8 @@ declare class ASM_Memory {
     constructor(buffer: ArrayBuffer);
     set(addr: number, value: number, type?: 1 | 2 | 4 | 40 | 80): this;
     get(addr: number, type?: 1 | 2 | 4 | 40 | 80): number;
-    getRange(addr: number, len: number, type?: 1 | 2 | 4 | 40 | 80): Int8Array | Int16Array | Int32Array | Float32Array | Float64Array;
     avail(type?: 1 | 2 | 4 | 40 | 80): number;
+    struct(values: any[], type?: 1 | 2 | 4 | 40 | 80, nested?: boolean): MemoryObj;
     malloc(size: number, type?: 1 | 2 | 4 | 40 | 80): number[];
-    free(addr: number[], type?: 1 | 2 | 4 | 40 | 80): this;
+    free(addr: number[] | MemoryObj, type?: 1 | 2 | 4 | 40 | 80): this;
 }

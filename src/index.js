@@ -24,11 +24,11 @@ const writeFile = _bluebird2.default.promisify(fs.writeFile);
 const execFile = _bluebird2.default.promisify(cp.execFile);
 const rf = _bluebird2.default.promisify(rimraf);
 
-function buildModule(publicPath, wasmArray, memoryJS) {
+function buildModule(disableMemoryClass, publicPath, wasmArray, memoryJS) {
 
 	return `module.exports = {
 		init: (adjustEnv) => {
-			${memoryJS}
+			${disableMemoryClass ? "" : memoryJS}
 			adjustEnv = adjustEnv || function(obj) { return obj};
 			return new Promise((res, rej) => {
 				if (typeof WebAssembly === "undefined") {
@@ -58,7 +58,7 @@ function buildModule(publicPath, wasmArray, memoryJS) {
 				let tempDoublePtr = STATICTOP; STATICTOP += 16;
 				let DYNAMICTOP_PTR = staticAlloc(4);
 
-				const asmMEM = new ASM_Memory(mem.buffer);
+				const asmMEM = ${disableMemoryClass ? "null;" : "new ASM_Memory(mem.buffer);"}
 
 				WebAssembly.instantiateStreaming(
 						new Response(new Uint8Array(${JSON.stringify(wasmArray)}), {
@@ -72,7 +72,8 @@ function buildModule(publicPath, wasmArray, memoryJS) {
 								},
 								'___setErrNo': noop,
 								'_console': (n) => console.log(n),
-								'_mallocjs': (len, type) => asmMEM.malloc(len, type || 40)[0],
+								${disableMemoryClass ? "" :
+								`'_mallocjs': (len, type) => asmMEM.malloc(len, type || 40)[0],
 								'_freejs': (start, len, type) => {
 									type = type || 40;
 									let bytes = type > 4 ? Math.round(type / 10) : type;
@@ -81,7 +82,7 @@ function buildModule(publicPath, wasmArray, memoryJS) {
 										arr.push(start + (i * bytes));
 									}
 									asmMEM.free(arr, type);
-								},
+								},`}
 								'enlargeMemory': noop,
 								'getTotalMemory': () => TOTAL_MEMORY,
 								'abortOnCannotGrowMemory': noop,
@@ -161,7 +162,7 @@ exports.default = async function loader(content) {
 
 		const memoryModule = await readFile(path.join(__dirname, "mem.js"));
 
-		const module = buildModule(options.publicPath, wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)), memoryModule);
+		const module = buildModule(options.disableMemoryClass, options.publicPath, wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)), memoryModule);
 
 		if (options.emitWasm) {
 			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm", wasmContent);

@@ -9,11 +9,13 @@ function loadOptions(loader) {
 
   var emccPath = options.emccPath ? options.emccPath : process.platform === 'win32' ? 'em++.bat' : 'em++';
   var publicPath = options.publicPath ? options.publicPath : '';
+  var disableMemoryClass = options.disableMemoryClass ? options.disableMemoryClass : false;
 
   return {
     emccPath, 
     emccFlags: options.emccFlags, 
     emitWasm: options.emitWasm,
-    publicPath
+    publicPath,
+    disableMemoryClass
   };
 }
