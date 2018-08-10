@@ -1,3 +1,7 @@
+# 0.7.7 - 8/10/2018
+- A few small bugfixes.
+- Added README stuff.
+
 # 0.7.6 - 8/9/2018
 - Added fallback to `instantiate` if `instantiateStreaming` isn't available.
 - Removed more code if `disableMemoryClass` is enabled.

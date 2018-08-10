@@ -94,7 +94,9 @@ wasm.init((imports) => {
 ```
 
 ## Using The Memory Manager Class
-The class can provide a list of available memory addresses upon request.  Memory can be allocated and freed from either C/C++ or Javascript using the class.  The memory addresses can then be used to set or access the value of the variable at that address in Javascript or C/C++.  Using the memory manager class over native `malloc` and `free` in C can save ~6KB.
+The easiest way to move data between Javascript and Webassembly/C is by using the shared memory buffer.  The shared memory buffer allows javascript or C/C++ code to access the variables directly, mutate them and read them efficiently.  The problem is shared variables must be set to a specific address in the memory.  Sharing this address between Javascript and C/C++ as well as making sure you don't create a new variable over it can be a pain in the neck.  The memory manager class solves this problem.
+
+The class can provide available memory addresses upon request.  Memory can be allocated and freed from either C/C++ or Javascript using the class.  The memory addresses can then be used to set or access the value of the variable at that address in Javascript or C/C++.  Using the memory manager class over native `malloc` and `free` in C can save ~6KB.
 
 When using `malloc` or `struct` addresses are gauranteed to be contiguous just like in C/C++.
 

@@ -10,7 +10,6 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "cpp-wasm-loader": "^0.7.5",
     "webpack": "^4.9.1",
     "webpack-cli": "^2.1.4",
     "webpack-dev-server": "^3.1.4"

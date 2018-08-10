@@ -87,6 +87,7 @@ function buildModule(externalWASM, wasmFileName, disableMemoryClass, publicPath,
 						}
 						asmMEM.free(arr, type);
 					},`}
+					'_emscripten_memcpy_big': () => null,
 					'enlargeMemory': noop,
 					'getTotalMemory': () => TOTAL_MEMORY,
 					'abortOnCannotGrowMemory': noop,
