@@ -1,20 +1,22 @@
 # CPP to WASM Webpack Loader
 
-<div>
-<a title="By Carlos Baraza [CC0], via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File%3AWeb_Assembly_Logo.svg"><img height="128" alt="Web Assembly Logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Web_Assembly_Logo.svg/512px-Web_Assembly_Logo.svg.png"/></a>
+<div align="center">
 <a title="By Jeremy Kratz (https://github.com/isocpp/logos) [Copyrighted free use], via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File%3AISO_C%2B%2B_Logo.svg"><img height="128" alt="ISO C++ Logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/ISO_C%2B%2B_Logo.svg/256px-ISO_C%2B%2B_Logo.svg.png"/></a>
+<a title="By Carlos Baraza [CC0], via Wikimedia Commons" href="https://commons.wikimedia.org/wiki/File%3AWeb_Assembly_Logo.svg"><img height="128" alt="Web Assembly Logo" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/Web_Assembly_Logo.svg/512px-Web_Assembly_Logo.svg.png"/></a>
+
+[![NPM](https://nodei.co/npm/cpp-wasm-loader.png?compact=true)](https://nodei.co/npm/cpp-wasm-loader/)
 </div>
 
-[![NPM](https://nodei.co/npm/cpp-wasm-loader.png?downloads=true&stars=true)](https://nodei.co/npm/cpp-wasm-loader/)
 
 Load C/C++ source files directly into javascript with a zero bloat.
 
-- Minimal execution environment, bundles start at only **1.2kb gzipped**.
-- No external files required, compiled Webassembly is optionally embedded into the js bundle.
+- Minimal emscripten execution environment, bundles with embedded wasm start at only **1.2kb gzipped**.
+- WebAssembly can be embedded directly into your JS bundle or shipped separately and loaded asynchronously.
 - Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
 - Falls back to `WebAssembly.instantiate` if `WebAssembly.instantiateStreaming` isn't available.
 - Includes an optional memory manager class to easily handle `malloc` and `free` on the javascript side (saves ~6KB).
 - Adding custom javascript functions to call from C/C++ or vise versa is a breaze.
+- Supports optional `ASM.JS` compilation as a Webassembly fallback, works with IE10+.
 
 ## Installation
 1. Install Emscripten following the instructions [here](https://kripken.github.io/emscripten-site/docs/getting_started/downloads.html).
@@ -43,12 +45,13 @@ The webpack loader has several options:
 	use: {
 		loader: 'cpp-wasm-loader',
 		options: {
-			// emitWasm: Boolean, emit Wasm file built by emscripten to the build folder.  Wasm file is still embedded into javascript file as well.
-			// emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), add or modify compiler flags
-			// emccPath: String, "path/to/emcc", // only needed if emcc is not in PATH,
-			// publicPath: String, Path from which your compiled wasm will be served. Should match `output.publicPath` in your webpack config.
+			// emitWasm: Boolean, emit Wasm file built by emscripten to the build folder for debugging.  Has no effect on whether wasm is embedded into the js bundle.
+			// emccFlags: (existingFlags: string[], mode?: "wasm"|"asmjs" ) => existingFlags.concat(["more", "flags", "here"]), add or modify compiler flags
+			// emccPath: String, "path/to/emcc", only needed if emcc is not in PATH,
 			// disableMemoryClass: Boolean, pass `true` to omit the memory manager class in the bundle. Saves ~1kb.
-			// externalWasm: Boolean, pass `true` to skip embedding the wasm file into your js files.  You'll need to ship the .wasm files along with your .js files if you use this option.
+			// fetchFiles: Boolean, pass `true` to skip embedding the wasm/asmjs files into your js bundle.  You'll need to ship the .wasm and .asm.js files along with your .js files if you use this option.
+			// loadAsmjs: Boolean, pass `true` to compile and embed an ASMJS version of your native code, the loader will fall back to ASMJS if Webassembly isn't supported. This will allow you native code to support IE10+.  If you add a TypedArray/ArrayBuffer polyfill (not included) you can get support back to IE9+.
+			// noWasm: Boolean, pass `true` to disable the Webassembly build/bundle entirely.  Useful with `loadAsmjs` to make ASMJS only bundles.
 		}
 	}
 }
@@ -86,12 +89,25 @@ wasm.init((imports) => {
 	return imports;
 }).then((module) => {
 	console.log(module.exports.add(1, 2)); // 3
-	console.log(module.memory) // Raw WebAssembly Memory object
+	console.log(module.memory) // Raw ArrayBuffer Memory object
 	console.log(module.memoryManager) // Memory Manager Class
+	console.log(module.raw) // The complete unmodified return value of the webassembly init promise.
 }).catch((err) => {
 	console.error(err);
 })
 ```
+
+## ASM.JS Support
+ASM.JS is specifically formatted javascript code that runs quite a bit faster than normal javascript.  Since it's just plain javascript it's supported by just about every browser with newer browsers supporting a special compilation with a performance boost.  When you pass `loadAsmjs` into the webpack config object an `ASMJS` version of your native code will be bundled with the javascript.  If Webassembly support isn't detected the `ASMJS` code will be loaded instead, allowing your native code to work on anything back to Internet Explorer 10.
+
+As of current (Q4 2018) `caniuse.com` stats, including ASMJS support moves your code from 75% global browser support to 95%.
+
+IE9 isn't supported because it lacks Typed Arrays, if you bundle a [Typed Array PolyFill](https://cdn.rawgit.com/inexorabletash/polyfill/v0.1.41/typedarray.js) you can even get support in IE9. 
+
+The only difference between loading ASMJS and Webassembly code is the `module` variable returned from the promise doesn't include some webassembly specific objects.  Speficially `module.raw` and `module.table` will be undefined when loading ASMJS instead of Webassembly.  ASMJS will also run considerably slower than Webassembly.
+
+**Note:** ASMJS code will only be bundled when webpack is compiling in `production` mode.
+**Note 2:** If you plan to support older browsers (any Internet Explorer version) make sure you bundle a Promise polyfill.  [lie-ts](https://npmjs.com/package/lie-ts) works and is only 1.2KB.
 
 ## Using The Memory Manager Class
 The easiest way to move data between Javascript and Webassembly/C is by using the shared memory buffer.  The shared memory buffer allows javascript or C/C++ code to access the variables directly, mutate them and read them efficiently.  The problem is shared variables must be set to a specific address in the memory.  Sharing this address between Javascript and C/C++ as well as making sure you don't create a new variable over it can be a pain in the neck.  The memory manager class solves this problem.
@@ -312,6 +328,21 @@ wasm.init().then((module) => {
 ```
 
 So why not just do javascript variables?  The advantage of using the memory class is we're creating values/variables that can be accessed and modified from javascript *and* WebAssembly/C.  So we can use Javascript to inilitize the values and save the address/pointers to a javascript class, then pass the pointers into C functions when we need to perform expensive calculations.
+
+## Example Bundle Sizes
+
+The table below shows the bundle differences when compiling the project in the `example` folder with different options.  The memory manager class will always add ~1 KB.  As your native code grows larger and more complex including ASMJS support will increase the size of the bundle significantly.  Since the example is so simple and small adding ASMJS support adds minimal code.
+
+| WASM | ASMJS | Memory Manager | Size \* |
+|------|-------|----------------|----------------|
+| ✕    | ✓     | ✕             | 1.0 KB         |
+| ✓    | ✕     | ✕             | 1.2 KB         |
+| ✓    | ✓     | ✕             | 1.3 KB         |
+| ✕    | ✓     | ✓             | 2.1 KB         |
+| ✓    | ✕     | ✓             | 2.3 KB         |
+| ✓    | ✓     | ✓             | 2.4 KB         |
+
+\* All sizes gzipped
 
 ## MIT License
 

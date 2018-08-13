@@ -17,6 +17,8 @@ function loadOptions(loader) {
     emitWasm: options.emitWasm,
     publicPath,
     disableMemoryClass,
-    externalWasm: options.externalWasm
+    fetchFiles: options.fetchFiles,
+    loadAsmjs: options.loadAsmjs,
+    noWasm: options.noWasm
   };
 }
