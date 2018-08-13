@@ -1,3 +1,6 @@
+# 0.7.9 - 8/12/2018
+- Fixed an issue with loader options.
+
 # 0.7.8 - 8/12/2018
 - Added `raw` property to promise result, contains the complete returned value from the webassembly initialization.
 - Added `asm.js` support.  You can now optionally include asm.js code in the bundle that will be loaded in the place of webassembly if webassembly isn't available.  Allows native code to work back to IE10.

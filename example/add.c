@@ -8,3 +8,4 @@ extern "C"
 		return a + b;
 	}
 }
+

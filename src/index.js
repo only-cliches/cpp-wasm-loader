@@ -278,10 +278,10 @@ exports.default = async function loader(content) {
 		
 		folder = await tmpDir();
 
-		let buildWASM = !options.noWasm && !options.emitWasm;
+		let buildWASM = !options.noWasm || options.emitWasm;
 
 		// build WASM for development mode regardless
-		if (!buildWASM && !this.minimize) {
+		if (!this.minimize) {
 			buildWASM = true;
 		}
 
@@ -325,14 +325,14 @@ exports.default = async function loader(content) {
 
 		const module = buildModule(options.noWasm, ASMContent, options.fetchFiles, wasmFileName, options.disableMemoryClass, options.publicPath, wasmHex, memoryModule);
 
-		if (buildWASM || options.fetchFiles) {
-			if (options.emitWasm) {
-				this.emitFile(wasmFileName, wasmContent);
-			}
-			if (ASMContent && ASMContent.length) {
-				this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".asm.js", ASMContent);
-			}
+		if (options.emitWasm || (options.fetchFiles && buildWASM)) {
+			this.emitFile(wasmFileName, wasmContent);
 		}
+
+		if (options.fetchFiles && options.loadAsmjs && this.minimize && ASMContent) {
+			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".asm.js", ASMContent);
+		}
+
 		if (folder !== null) {
 			await rf(folder);
 		}
