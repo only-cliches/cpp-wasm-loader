@@ -1,3 +1,6 @@
+# 0.8.1 8/16/2018
+- The C file is no longer copied to a temporary directory, allowing it to reference other files in the project.
+
 # 0.8.0 8/16/2018
 - Readme updates.
 - Now supports emscripten complete environments.  They take up WAY more space but provide complete feature support.  The feature is enabled with the new config option `fullEnv`.

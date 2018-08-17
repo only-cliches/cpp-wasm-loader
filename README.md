@@ -12,11 +12,9 @@ Load C/C++ source files directly into javascript with a zero bloat.
 
 - Optional minimal emscripten execution environment, bundles with embedded wasm start at only **1.2kb gzipped**.
 - WebAssembly can be embedded directly into your JS bundle or shipped separately and loaded asynchronously.
-- Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
-- Falls back to `WebAssembly.instantiate` if `WebAssembly.instantiateStreaming` isn't available.
 - Includes an optional memory manager class to easily handle `malloc` and `free` on the javascript side (saves ~6KB).
 - Adding custom javascript functions to call from C/C++ or vise versa is a breaze.
-- Supports optional `ASM.JS` compilation as a Webassembly fallback, works with IE10+.
+- Supports optional `ASM.JS` compilation with auto fallback, works with IE10+.
 - Possible to ship complete WASM bundle with ASMJS fallback in a single js file with **zero** xhr requests.
 - The only C/C++ webpack loader that can inject the full emscripten environment into your bundles.
 
@@ -111,7 +109,7 @@ wasm.init((imports) => {
 ```
 
 ## ASM.JS Support
-ASM.JS is specifically formatted javascript code that runs quite a bit faster than normal javascript.  Since it's just plain javascript it's supported by just about every browser with newer browsers supporting a special compilation with a performance boost.  When you pass `loadAsmjs` into the webpack config object an `ASMJS` version of your native code will be bundled with the javascript.  If Webassembly support isn't detected the `ASMJS` code will be loaded instead, allowing your native code to work on anything back to Internet Explorer 10.
+ASM.JS is specifically formatted javascript code that runs quite a bit faster than normal javascript.  Since it's just plain javascript it's supported by just about every browser with newer browsers supporting a special compilation with a performance boost.  When you pass `asmJs` into the webpack config object an `ASMJS` version of your native code will be bundled with the javascript.  If Webassembly support isn't detected the `ASMJS` code will be loaded instead, allowing your native code to work on anything back to Internet Explorer 10.
 
 As of current (Q4 2018) `caniuse.com` stats, including ASMJS support moves your code from 75% global browser support to 95%.
 

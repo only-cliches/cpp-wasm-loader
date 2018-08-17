@@ -13,6 +13,13 @@ const md5 = require("md5");
 const tmpDir = _bluebird.promisify(tmp.dir);
 const readFile = _bluebird.promisify(fs.readFile);
 const writeFile = _bluebird.promisify(fs.writeFile);
+const unlink = (fileName) => {
+	return new Promise((res, rej) => {
+		fs.unlink(fileName, (err) => {
+			res();
+		});
+	});
+}
 const execFile = _bluebird.promisify(cp.execFile);
 const rf = _bluebird.promisify(rimraf);
 
@@ -363,7 +370,7 @@ function createBuildWasmName(resource, content) {
 
 exports.default = async function loader(content) {
 	let cb = this.async();
-	let folder = null;
+	// let folder = null;
 
 
 	try {
@@ -377,10 +384,10 @@ exports.default = async function loader(content) {
 		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
 		const indexFile = wasmBuildName.replace('.wasm', '.js');
 		
-		folder = await tmpDir();
+		// folder = await tmpDir();
 		
 		// write source to tmp directory
-		await writeFile(path.join(folder, inputFile), content);
+		// await writeFile(path.join(folder, inputFile), content);
 
 		const buildWASM = this.minimize ? options.wasm : true;
 		const buildASMJS = this.minimize ? options.asmJs : false;
@@ -389,7 +396,7 @@ exports.default = async function loader(content) {
 		let asmjsMem = [];
 
 		if (buildASMJS) {
-			let ASMJSFlags = [inputFile, '-s', 'WASM=0',"--separate-asm", "-Os"];
+			let ASMJSFlags = [this.resourcePath, '-s', 'WASM=0',"--separate-asm", "-Os"];
 			if (!options.fullEnv) {
 				ASMJSFlags = ASMJSFlags.concat(["-s", "ONLY_MY_CODE=1"])
 			}
@@ -400,12 +407,12 @@ exports.default = async function loader(content) {
 			}
 			// compile source file to ASMJS
 			await execFile(options.emccPath, ASMJSFlags.concat(['-o', indexFile]), {
-				cwd: folder
+				cwd: this.context
 			});
-			asmJSCode = await readFile(path.join(folder, indexFile.replace(".js", ".asm.js")));
+			asmJSCode = await readFile(path.join(this.context, indexFile.replace(".js", ".asm.js")));
 			asmJSCode = asmJSCode.toString();
 
-			asmjsEnv = options.fullEnv ? await readFile(path.join(folder, indexFile)) : "";
+			asmjsEnv = options.fullEnv ? await readFile(path.join(this.context, indexFile)) : "";
 			
 			asmjsEnv = asmjsEnv.toString()
 						.replace(/require\(.fs.\)/gmi, "undefined") 
@@ -414,7 +421,7 @@ exports.default = async function loader(content) {
 
 			// embed ASMJS memory file
 			try {
-				asmjsMem = await readFile(path.join(folder, indexFile + ".mem"));
+				asmjsMem = await readFile(path.join(this.context, indexFile + ".mem"));
 				asmjsMem = asmjsMem.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16));
 			} catch(e) {
 	
@@ -448,14 +455,12 @@ exports.default = async function loader(content) {
 			}
 		}
 
-
-
 		let wasmHex = [];
 		let wasmEnv = "";
 		let wasmContent = "";
 		let wasmFileName = this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm";
 		if (buildWASM) {
-			let wasmFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", this.minimize ? "-Os" : "-O1"];
+			let wasmFlags = [this.resourcePath, '-s', 'WASM=1', "-s", "BINARYEN=1", this.minimize ? "-Os" : "-O1"];
 
 			if (options.emccFlags && typeof options.emccFlags === "function") {
 				wasmFlags = options.emccFlags(wasmFlags, "wasm");
@@ -464,14 +469,14 @@ exports.default = async function loader(content) {
 			}
 			// compile source file to WASM
 			await execFile(options.emccPath, wasmFlags.concat(['-o', indexFile]), {
-				cwd: folder
+				cwd: this.context
 			});
 
 			const wasmFile = wasmBuildName;
-			wasmContent = await readFile(path.join(folder, wasmFile));
+			wasmContent = await readFile(path.join(this.context, wasmFile));
 	
 			wasmHex = wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16));
-			wasmEnv = options.fullEnv ? await readFile(path.join(folder, indexFile)) : "";
+			wasmEnv = options.fullEnv ? await readFile(path.join(this.context, indexFile)) : "";
 
 			if (wasmEnv && wasmEnv.length) {
 				wasmEnv = wasmEnv.toString()
@@ -520,15 +525,19 @@ exports.default = async function loader(content) {
 			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".asm.js", asmJSCode);
 		}
 
-		if (folder !== null) {
+		/*if (folder !== null) {
 			await rf(folder);
-		}
+		}*/
+		await unlink(path.join(this.context, indexFile));
+		await unlink(path.join(this.context, indexFile.replace(".js", ".asm.js")));
+		await unlink(path.join(this.context, indexFile.replace(".js", ".wasm")));
+		await unlink(path.join(this.context, indexFile + ".mem"));
 		cb(null, module);
 
 	} catch (e) {
-		if (folder !== null) {
+		/*if (folder !== null) {
 			await rf(folder);
-		}
+		}*/
 		cb(e);
 	}
 
