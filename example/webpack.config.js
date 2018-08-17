@@ -26,11 +26,11 @@ module.exports = {
                     // emitWasm: true, // emit WASM file built by emscripten to the build folder
                     // emccFlags: (existingFlags) => existingFlags.concat(["more", "flags", "here"]), // add or modify compiler flags
                     // emccPath: "path/to/emcc", // only needed if emcc is not in PATH,
-                    // memoryClass: false, // disable javascript memory management class,
+                    memoryClass: false, // disable javascript memory management class,
                     // fetchFiles: true,
-                    asmJs: true,
-                    wasm: true,
-                    fullEnv: true
+                    // asmJs: true,
+                    // wasm: true,
+                    // fullEnv: true
                 }
             }
         }]
