@@ -1,3 +1,8 @@
+# 0.8.2 8/16/2018
+- Fixed NodeJS error.
+- Added check for nodejs builds.
+- Fixed emccArgs bug.
+
 # 0.8.1 8/16/2018
 - The C file is no longer copied to a temporary directory, allowing it to reference other files in the project.
 

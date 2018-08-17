@@ -191,7 +191,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 				document.getElementsByTagName('head')[0].appendChild(s);
 			}
 
-			var path = location.pathname.split("/");
+			var path = typeof location !== "undefined" ? location.pathname.split("/") : [];
 			path.pop();
 			Module.buffer = ie && ie < 10 ? new ArrayBuffer(100000) : Module.buffer;
 
@@ -372,7 +372,6 @@ exports.default = async function loader(content) {
 	let cb = this.async();
 	// let folder = null;
 
-
 	try {
 		const options = (0, _options.loadOptions)(this);
 
@@ -401,7 +400,7 @@ exports.default = async function loader(content) {
 				ASMJSFlags = ASMJSFlags.concat(["-s", "ONLY_MY_CODE=1"])
 			}
 			if (options.emccFlags && typeof options.emccFlags === "function") {
-				ASMJSFlags = options.emccFlags(defaultFlags, "asmjs");
+				ASMJSFlags = options.emccFlags(ASMJSFlags, "asmjs");
 			} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
 				ASMJSFlags = ASMJSFlags.concat(options.emccFlags);
 			}
@@ -414,10 +413,14 @@ exports.default = async function loader(content) {
 
 			asmjsEnv = options.fullEnv ? await readFile(path.join(this.context, indexFile)) : "";
 			
-			asmjsEnv = asmjsEnv.toString()
-						.replace(/require\(.fs.\)/gmi, "undefined") 
-						.replace(/require\(.path.\)/gmi, "undefined")
-						.replace(/var Module.+?;/gm, "");
+			asmjsEnv = asmjsEnv.toString().replace(/var Module.+?;/gm, "");
+
+			// remove node require statements
+			if (this.target !== "node") {
+				asmjsEnv = asmjsEnv				
+					.replace(/require\(.fs.\)/gmi, "undefined") 
+					.replace(/require\(.path.\)/gmi, "undefined")
+			}
 
 			// embed ASMJS memory file
 			try {
@@ -480,12 +483,16 @@ exports.default = async function loader(content) {
 
 			if (wasmEnv && wasmEnv.length) {
 				wasmEnv = wasmEnv.toString()
-				// remove node require statements
-				.replace(/require\(.fs.\)/gmi, "undefined") 
-				.replace(/require\(.path.\)/gmi, "undefined")
 				// adjust code that causes minify error
 				.replace(".replace(/\\\\/g,\"/\")", ".split('').map(function(s) { return s === '\\\\' ? '/' : s;}).join('');")
 				.replace(/var Module.+?;/gm, "")
+
+				// remove node require statements
+				if (this.target !== "node") {
+					wasmEnv = wasmEnv				
+					.replace(/require\(.fs.\)/gmi, "undefined") 
+					.replace(/require\(.path.\)/gmi, "undefined")
+				}
 	
 				let initArrayBuff = wasmEnv.indexOf("function instantiateArrayBuffer");
 				let initArrayBuffEnd = initArrayBuff;
