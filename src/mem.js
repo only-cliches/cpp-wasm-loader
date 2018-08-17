@@ -22,6 +22,15 @@ var ASM_Memory = (function () {
         this.mem[80] = this.mem.double;
         this.max = buffer.byteLength - 1;
     }
+    ASM_Memory.prototype.scan = function () {
+        var _this = this;
+        this.mem.char.forEach(function (val, i) {
+            if (val > 0) {
+                _this.allocPointer = i;
+                _this.allocList[i] = true;
+            }
+        });
+    };
     ASM_Memory.prototype.set = function (addr, value, type) {
         if (type === void 0) { type = 40; }
         if (typeof addr !== "number" || typeof value !== "number") {

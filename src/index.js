@@ -2,16 +2,7 @@
 
 const _options = require('./options');
 
-// em++ -Os -s WASM=0 -s ONLY_MY_CODE=1  add.c -o output.js
-
-function _interopRequireDefault(obj) {
-	return obj && obj.__esModule ? obj : {
-		default: obj
-	};
-}
-
 const _bluebird = require('bluebird');
-const _bluebird2 = _interopRequireDefault(_bluebird);
 const cp = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -19,234 +10,348 @@ const tmp = require('tmp');
 const rimraf = require('rimraf');
 const md5 = require("md5");
 
-const tmpDir = _bluebird2.default.promisify(tmp.dir);
-const readFile = _bluebird2.default.promisify(fs.readFile);
-const writeFile = _bluebird2.default.promisify(fs.writeFile);
-const execFile = _bluebird2.default.promisify(cp.execFile);
-const rf = _bluebird2.default.promisify(rimraf);
+const tmpDir = _bluebird.promisify(tmp.dir);
+const readFile = _bluebird.promisify(fs.readFile);
+const writeFile = _bluebird.promisify(fs.writeFile);
+const execFile = _bluebird.promisify(cp.execFile);
+const rf = _bluebird.promisify(rimraf);
 
-function buildModule(noWASM, asmJScontent, fetchFiles, wasmFileName, disableMemoryClass, publicPath, wasmArray, memoryJS) {
+function minimalEnv(memoryClass) {
+	return `
+		var WASM_PAGE_SIZE = 65536;
+		var TOTAL_MEMORY = 16777216;
+		var noop = function(v) { return v};
+		var staticAlloc = function(size) {
+			var ret = STATICTOP;
+			STATICTOP = (STATICTOP + size + 15) & -16;
+			return ret;
+		}
 
-	let loadASMModule = `// adjust envrionment
-		${disableMemoryClass ? "var asmMEM = {}" : "var asmMEM = new ASM_Memory(buffer);"}
-		baseEnv = adjustEnv(baseEnv(asmMEM));
+		var STATICTOP = 2752;
+		var tempDoublePtr = STATICTOP; STATICTOP += 16;
+		var DYNAMICTOP_PTR = staticAlloc(4);
 
-		// init asmjs
-		var exports = Module["asm"](window, baseEnv, buffer);
-		
-		res({
-			raw: {},
-			exports: Object.keys(exports).reduce(function(prev, cur) {
-				prev[cur.replace("_", "")] = exports[cur];
-				return prev;
-			}, {}),
-			memory: buffer,
-			${disableMemoryClass ? "" : "memoryManager: asmMEM,"}
-			table: {},
-			locateFile: function(name) { return ${JSON.stringify(publicPath)} + name; }
-		});
+		var buffer;
+		if (typeof WebAssembly === "object" && typeof WebAssembly.Memory === "function") {
+			Module["wasmMemory"] = new WebAssembly.Memory({
+				"initial": TOTAL_MEMORY / WASM_PAGE_SIZE,
+				"maximum": TOTAL_MEMORY / WASM_PAGE_SIZE
+			});
+			buffer = Module["wasmMemory"].buffer
+		} else {
+			buffer = new ArrayBuffer(TOTAL_MEMORY);
+		}
+		Module.buffer = buffer
+
+		${!memoryClass ? `
+			Module.asmClass = {};
+		` : `				
+			Module.asmClass = new ASM_Memory(Module.buffer);
+		`}
+
+		var globalEnv = {
+			"global": window,
+			"env": {
+				'_time': function(ptr) {
+					return Date.now();
+				},
+				'___setErrNo': noop,
+				'_console': function(n) { console.log(n) },
+				'_emscripten_memcpy_big': function(dest, src, num) {
+					var heap8 = new Uint8Array(mem);
+					heap8.set(heap8.subarray(src, src + num), dest);
+					return dest
+				},
+				'enlargeMemory': noop,
+				'getTotalMemory': function() { return TOTAL_MEMORY },
+				'abortOnCannotGrowMemory': noop,
+				'DYNAMICTOP_PTR': DYNAMICTOP_PTR,
+				'tempDoublePtr': tempDoublePtr,
+				'assert': function(condition, text) { 
+					if (!condition) { baseEnv.abort(text) } 
+				}, 
+				'ABORT': function(err) {
+					throw new Error(err);
+				},
+				'abort': function(err) {
+					throw new Error(err)
+				},
+				'abortStackOverflow': function() {
+					throw new Error('overflow');
+				},
+				'STACKTOP': 0,
+				'STACK_MAX': 16777216
+			},
+			"asm2wasm": {
+				"f64-rem": (function (x, y) {
+					return x % y
+				}),
+				"debugger": (function () {
+					debugger
+				})
+			},
+			"parent": Module
+		};
+	`;
+}
+
+function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, asmjsMem) {
+
+	let initASMJS = "";
+
+	if (asmjsEnv && asmjsEnv.length) {
+		// full environment
+		initASMJS = `${asmjsEnv.replace("// EMSCRIPTEN_START_ASM",`
+				// EMSCRIPTEN_START_ASM\n
+				${!memoryJS ? `
+					Module.asmClass = {};
+				` : `				
+					Module.asmClass = new ASM_Memory(Module.buffer);
+				`} Module.asmLibraryArg = bindMemory(Module.asmLibraryArg, Module.asmClass, "asmjs");`
+			)}
+
+			setTimeout(function() {
+				Module.asmClass.scan();
+				resolve({
+					exports: Object.keys(asm).reduce(function(prev, cur) {
+						prev[cur.replace("_", "")] = asm[cur];
+						return prev;
+					}, {}),
+					memory: Module.buffer,
+					${!memoryJS ? "" : "memoryManager: Module.asmClass,"}
+				});
+			}, 10);
 		`;
+	} else {
+		// minimal environment
+		initASMJS = `
+			${asmjsMem && asmjsMem.length ? `var heap8 = new Uint8Array(Module.buffer);
+			heap8.set(new Uint8Array([${asmjsMem}]), 8);` : ""}
 
-	return `module.exports = {
-		init: function(adjustEnv) {
+			${!memoryJS ? `
+				Module.asmClass = {};
+			` : `				
+				Module.asmClass = new ASM_Memory(Module.buffer);
+				Module.asmClass.scan();
+			`}
+			globalEnv.env = bindMemory(globalEnv.env, Module.asmClass, "asmjs");
 
-			${disableMemoryClass ? "" : memoryJS}
+			// init asmjs
+			var exports = Module["asm"](window, globalEnv.env, Module.buffer);
+			
+			resolve({
+				exports: Object.keys(exports).reduce(function(prev, cur) {
+					prev[cur.replace("_", "")] = exports[cur];
+					return prev;
+				}, {}),
+				memory: Module.buffer,
+				${!memoryJS ? "" : "memoryManager: Module.asmClass,"}
+			});
+		`;
+	}
 
-			adjustEnv = adjustEnv || function(obj) { return obj};
+	let code = `
+		var ie = (function(){
 
-			var WASM_PAGE_SIZE = 65536;
-			var TOTAL_MEMORY = 16777216;
-			var noop = function(v) { return v};
-
-			var staticAlloc = function(size) {
-				var ret = STATICTOP;
-				STATICTOP = (STATICTOP + size + 15) & -16;
-				return ret;
+			var undef,
+				v = 3,
+				div = document.createElement('div'),
+				all = div.getElementsByTagName('i');
+			
+			while (
+				div.innerHTML = '<!--[if gt IE ' + (++v) + ']><i></i><![endif]-->',
+				all[0]
+			);
+			
+			return v > 4 ? v : undef;
+			
+		}());
+	`;
+	
+	if (fetchFiles) {
+		code += `
+			function loadJS(src, callback) {
+				var s = document.createElement('script');
+				s.src = src;
+				s.async = true;
+				s.onreadystatechange = s.onload = function() {
+					var state = s.readyState;
+					if (!callback.done && (!state || /loaded|complete/.test(state))) {
+						callback.done = true;
+						callback();
+					}
+				};
+				document.getElementsByTagName('head')[0].appendChild(s);
 			}
 
-			var STATICTOP = 2752;
-			var tempDoublePtr = STATICTOP; STATICTOP += 16;
-			var DYNAMICTOP_PTR = staticAlloc(4);
+			var path = location.pathname.split("/");
+			path.pop();
+			Module.buffer = ie && ie < 10 ? new ArrayBuffer(100000) : Module.buffer;
 
-			var baseEnv = function(mem) {
-				return {
-					'_time': function(ptr) {
-						return Date.now();
-					},
-					'___setErrNo': noop,
-					'_console': function(n) { console.log(n) },
-					${disableMemoryClass ? `
-					 '_mallocjs': noop,
-					 '_freejs': noop,` :
-					`'_mallocjs': function(len, type) {
-						return mem.malloc(len, type || 40)[0]
-					},
-					'_freejs': function(start, len, type) {
+			loadJS(path.join("/") + "/" + "${wasmFileName.replace(".wasm", ".asm.js")}", function() {
+				${initASMJS}
+			});
+		`;
+	} else {
+		code += `
+			${asmJSCode}
+			${initASMJS}
+		`;
+	}
+	return code;
+}
+
+function wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS) {
+	
+
+	return `
+		var instanceCallback;
+
+		${wasmEnv ? wasmEnv.replace("[custom-loader]", `
+			Module["wasmBinary"] = [];
+			globalEnv = info;
+			function instantiateArrayBuffer(receiver) {
+				instanceCallback = receiver;
+				${!memoryJS ? `
+					Module.asmClass = {};
+				` : `				
+					Module.asmClass = new ASM_Memory(Module.buffer);
+				`}
+			}
+		`) : `
+			if (!globalEnv.env["table"]) {
+				var TABLE_SIZE = Module["wasmTableSize"] || 6;
+				var MAX_TABLE_SIZE = Module["wasmMaxTableSize"] || 6;
+				if (typeof WebAssembly === "object" && typeof WebAssembly.Table === "function") {
+					if (MAX_TABLE_SIZE !== undefined) {
+						globalEnv.env["table"] = new WebAssembly.Table({
+							"initial": TABLE_SIZE,
+							"maximum": MAX_TABLE_SIZE,
+							"element": "anyfunc"
+						})
+					} else {
+						globalEnv.env["table"] = new WebAssembly.Table({
+							"initial": TABLE_SIZE,
+							element: "anyfunc"
+						})
+					}
+				} else {
+					globalEnv.env["table"] = new Array(TABLE_SIZE)
+				}
+				Module["wasmTable"] = globalEnv.env["table"]
+			}
+			if (!globalEnv.env["memoryBase"]) {
+				globalEnv.env["memoryBase"] = Module["STATIC_BASE"]
+			}
+			if (!globalEnv.env["tableBase"]) {
+				globalEnv.env["tableBase"] = 0
+			}
+			if (!globalEnv.env["memory"]) {
+				globalEnv.env["memory"] = Module["wasmMemory"];
+			}
+		`}
+
+		${fetchFiles ? `` : `var wasmBinary = new Uint8Array(${JSON.stringify(wasmArray)})`}
+
+		var init = WebAssembly.instantiateStreaming || WebAssembly.instantiate;
+		var hasStreaming = typeof WebAssembly.instantiateStreaming === "function";
+	
+		globalEnv.env = bindMemory(globalEnv.env, Module.asmClass, "wasm");
+	
+		var path = location.pathname.split("/");
+		path.pop();
+	
+		(function() {
+			if (hasStreaming) {
+				return init(${fetchFiles ? `fetch(path.join("/") + "/" + "${wasmFileName}")` : `new Response(wasmBinary, {
+					headers: {
+						"content-type": "application/wasm"
+					}
+				})`}, globalEnv)
+			} else {
+				${fetchFiles ? `return fetch(path.join("/") + "/" + "${wasmFileName}").then(r => r.arrayBuffer()).then((bin) => {
+						return init(bin, globalEnv);
+					});` : `return init(wasmBinary, globalEnv);`}
+			}
+		})().then(function(e) {	
+			if (instanceCallback) {
+				instanceCallback(e);
+			}
+			resolve({
+				raw: e,
+				emModule: Module,
+				exports: Object.keys(e.instance.exports).reduce(function(prev, cur) {
+					prev[cur.replace("_", "")] = e.instance.exports[cur];
+					return prev;
+				}, {}),
+				memory: Module.buffer,
+				${!memoryJS ? "" : "memoryManager: Module.asmClass,"}
+			});
+		}).catch(reject);
+
+	`;
+}
+
+function buildModule(wasmEnv, asmjsEnv, asmJSCode, asmjsMem, fetchFiles, wasmFileName, memoryJS, wasmArray) {
+	return `module.exports = {
+		init: function(adjustEnv) {
+			if (typeof Promise === "undefined") {
+				throw new Error("No Promise support!");
+			}
+			if (typeof ArrayBuffer === "undefined") {
+				throw new Error("No ArrayBuffer support!");
+			}
+
+			${fetchFiles ? `
+			if (typeof fetch === "undefined") {
+				throw new Error("No Fetch support!");
+			}
+			` : ``}
+
+			adjustEnv = typeof adjustEnv === "undefined" ? function(obj) { return obj} : adjustEnv;
+
+			${memoryJS ? `
+				${memoryJS}		
+				function bindMemory(env, memClass, type) {
+					env._mallocjs = function(len, type) {
+						return memClass.malloc(len, type || 40)[0]
+					};
+					env._freejs = function(start, len, type) {
 						type = type || 40;
 						var bytes = type > 4 ? Math.round(type / 10) : type;
 						var arr = [];
 						for (var i = 0; i < len; i++) {
 							arr.push(start + (i * bytes));
 						}
-						mem.free(arr, type);
-					},`}
-					'_emscripten_memcpy_big': function(dest, src, num) {
-						var heap8 = new Uint8Array(mem);
-						heap8.set(heap8.subarray(src, src + num), dest);
-						return dest
-					},
-					'enlargeMemory': noop,
-					'getTotalMemory': function() { return TOTAL_MEMORY },
-					'abortOnCannotGrowMemory': noop,
-					'DYNAMICTOP_PTR': DYNAMICTOP_PTR,
-					'tempDoublePtr': tempDoublePtr,
-					'assert': function(condition, text) { 
-						if (!condition) { baseEnv.abort(text) } 
-					}, 
-					'ABORT': function(err) {
-						throw new Error(err);
-					},
-					'abort': function(err) {
-						throw new Error(err)
-					},
-					'abortStackOverflow': function() {
-						throw new Error('overflow');
-					},
-					'STACKTOP': 0,
-					'STACK_MAX': 16777216
+						memClass.free(arr, type);
+					};
+					return adjustEnv(env, type);
 				}
-			}
-
-			if (typeof Promise === "undefined") {
-				throw new Error("Promise must be polyfilled!");
-			}
-
-			if (${noWASM ? `true` : `typeof WebAssembly === "undefined"`}) {
-
-				var ie = (function(){
-
-					var undef,
-						v = 3,
-						div = document.createElement('div'),
-						all = div.getElementsByTagName('i');
-					
-					while (
-						div.innerHTML = '<!--[if gt IE ' + (++v) + ']><i></i><![endif]-->',
-						all[0]
-					);
-					
-					return v > 4 ? v : undef;
-					
-				}());
-
-				if (typeof ArrayBuffer === "undefined") {
-					throw new Error("No ArrayBuffer support!");
-				}
-				
-				// ASMJS support
-				${asmJScontent && asmJScontent.length ? (fetchFiles ? `
-					function loadJS(src, callback) {
-						var s = document.createElement('script');
-						s.src = src;
-						s.async = true;
-						s.onreadystatechange = s.onload = function() {
-							var state = s.readyState;
-							if (!callback.done && (!state || /loaded|complete/.test(state))) {
-								callback.done = true;
-								callback();
-							}
-						};
-						document.getElementsByTagName('head')[0].appendChild(s);
-					}
-
-					if (!window.Module) {
-						window.Module = {};
-					}
-
-					var path = location.pathname.split("/");
-					path.pop();
-					var buffer = new ArrayBuffer(ie && ie < 10 ? 100000 : 16777216);
-					return new Promise(function(res, rej) {
-						loadJS(path.join("/") + "/" + "${wasmFileName.replace(".wasm", ".asm.js")}", function() {
-							${loadASMModule}
-						});
-					});
-				` : `
-					var buffer = new ArrayBuffer(ie && ie < 10 ? 100000 : 16777216);
-					
-					var Module = {};
-					${asmJScontent}
-					return new Promise(function(res, rej) {
-						${loadASMModule}
-					});
-
-				`) : `throw new Error("No Webassembly support!")`};
-				return;
-			}
-
-			${noWASM ? `` : `
-				
-				${fetchFiles ? `` : `var wasmBinary = new Uint8Array(${JSON.stringify(wasmArray)})`}
-
-				var mem = new WebAssembly.Memory({
-					'initial': TOTAL_MEMORY / WASM_PAGE_SIZE,
-					'maximum': TOTAL_MEMORY / WASM_PAGE_SIZE
-				});
-
-				var table = new WebAssembly.Table({
-					'initial': 6,
-					'maximum': 6,
-					'element': 'anyfunc'
-				});
-
-				${disableMemoryClass ? "var asmMEM = {}" : "var asmMEM = new ASM_Memory(mem.buffer);"}
-
-				// webassembly specific environment variables
-				baseEnv = baseEnv(asmMEM);
-				baseEnv.memory = mem;
-				baseEnv.memoryBase = 1024;
-				baseEnv.table = table;
-				baseEnv.tableBase = 0;
-
-				var webAssemblyConfig = {
-					env: adjustEnv(baseEnv)
-				};
-
-				
-				var init = WebAssembly.instantiateStreaming || WebAssembly.instantiate;
-				var hasStreaming = typeof WebAssembly.instantiateStreaming === "function";
-
-				var path = location.pathname.split("/");
-				path.pop();
-
-				return new Promise(function(res, rej) {
-					(function() {
-						if (hasStreaming) {
-							return init(${fetchFiles ? `fetch(path.join("/") + "/" + "${wasmFileName}")` : `new Response(wasmBinary, {
-								headers: {
-									"content-type": "application/wasm"
-								}
-							})`}, webAssemblyConfig)
-						} else {
-							${fetchFiles ? `return fetch(path.join("/") + "/" + "${wasmFileName}").then(r => r.arrayBuffer()).then((bin) => {
-									return init(bin, webAssemblyConfig);
-								});` : `return init(wasmBinary, webAssemblyConfig);`}
-						}
-					})().then(function(e) {
-						res({
-							raw: e,
-							exports: Object.keys(e.instance.exports).reduce(function(prev, cur) {
-								prev[cur.replace("_", "")] = e.instance.exports[cur];
-								return prev;
-							}, {}),
-							memory: mem,
-							${disableMemoryClass ? "" : "memoryManager: asmMEM,"}
-							table: table,
-							locateFile: function(name) { return ${JSON.stringify(publicPath)} + name; }
-						});
-					}).catch(rej);
-				});
+			` : `
+				function bindMemory(env, memClass, type) { return adjustEnv(env, type) };
 			`}
+			
+			${fetchFiles ? `window.Module = {}` : `var Module = {}`};
+			var globalEnv = {};
+			
+			return new Promise((resolve, reject) => {
+				// embed minimal invironemnt as long as neither ASMJS or WASM environments exist
+				${wasmEnv || asmjsEnv ? `` : minimalEnv(memoryJS)}
+
+				// ASMJS support
+				${asmJSCode ? `if (${wasmArray.length === 0 ? `true` : `typeof WebAssembly === "undefined"`}) {
+					${asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, asmjsMem)}
+					return;
+				}` : ``}
+
+				// WASM support
+				${wasmArray.length ? `
+					if (typeof WebAssembly === "undefined") {
+						throw new Error("No Webassembly support!");
+					}
+					${wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS)}
+				` : ``}
+			});
 		}
 	}`;
 }
@@ -260,47 +365,34 @@ exports.default = async function loader(content) {
 	let cb = this.async();
 	let folder = null;
 
+
 	try {
 		const options = (0, _options.loadOptions)(this);
 
+		if (!options.asmJs && !options.wasm) {
+			throw new Error("Oops!  You need to enable ASMJS or WASM support in cpp-wasm-loader options!")
+		}
 
 		const inputFile = `input${path.extname(this.resourcePath)}`;
 		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
 		const indexFile = wasmBuildName.replace('.wasm', '.js');
-
-		let wasmFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", this.minimize ? "-Os" : "-O1"];
-
-		if (options.emccFlags && typeof options.emccFlags === "function") {
-			wasmFlags = options.emccFlags(wasmFlags, "wasm");
-		} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
-			wasmFlags = wasmFlags.concat(options.emccFlags);
-		}
 		
 		folder = await tmpDir();
-
-		let buildWASM = !options.noWasm || options.emitWasm;
-
-		// build WASM for development mode regardless
-		if (!this.minimize) {
-			buildWASM = true;
-		}
-
+		
 		// write source to tmp directory
 		await writeFile(path.join(folder, inputFile), content);
 
-		if (buildWASM) {
-			// compile source file to WASM
-			await execFile(options.emccPath, wasmFlags.concat(['-o', indexFile]), {
-				cwd: folder
-			});
-		}
+		const buildWASM = this.minimize ? options.wasm : true;
+		const buildASMJS = this.minimize ? options.asmJs : false;
+		let asmJSCode = "";
+		let asmjsEnv = "";
+		let asmjsMem = [];
 
-
-
-		let ASMContent = "";
-
-		if (options.loadAsmjs && this.minimize) {
-			let ASMJSFlags = [inputFile, '-s', 'WASM=0', '-s','ONLY_MY_CODE=1', "-Os"];
+		if (buildASMJS) {
+			let ASMJSFlags = [inputFile, '-s', 'WASM=0',"--separate-asm", "-Os"];
+			if (!options.fullEnv) {
+				ASMJSFlags = ASMJSFlags.concat(["-s", "ONLY_MY_CODE=1"])
+			}
 			if (options.emccFlags && typeof options.emccFlags === "function") {
 				ASMJSFlags = options.emccFlags(defaultFlags, "asmjs");
 			} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
@@ -310,27 +402,122 @@ exports.default = async function loader(content) {
 			await execFile(options.emccPath, ASMJSFlags.concat(['-o', indexFile]), {
 				cwd: folder
 			});
-			ASMContent = await readFile(path.join(folder, indexFile.replace(".js", ".asm.js")));
-			ASMContent = ASMContent.toString();
+			asmJSCode = await readFile(path.join(folder, indexFile.replace(".js", ".asm.js")));
+			asmJSCode = asmJSCode.toString();
+
+			asmjsEnv = options.fullEnv ? await readFile(path.join(folder, indexFile)) : "";
+			
+			asmjsEnv = asmjsEnv.toString()
+						.replace(/require\(.fs.\)/gmi, "undefined") 
+						.replace(/require\(.path.\)/gmi, "undefined")
+						.replace(/var Module.+?;/gm, "");
+
+			// embed ASMJS memory file
+			try {
+				asmjsMem = await readFile(path.join(folder, indexFile + ".mem"));
+				asmjsMem = asmjsMem.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16));
+			} catch(e) {
+	
+			}
+
+			if (asmjsMem.length && asmjsEnv) {
+				let initArrayBuff = asmjsEnv.indexOf("if (memoryInitializer)");
+				if (initArrayBuff === -1) {
+					initArrayBuff = asmjsEnv.indexOf("if(memoryInitializer)");
+				}
+				let initArrayBuffEnd = initArrayBuff;
+				let level = 0;
+				let ptr = initArrayBuff;
+				while (ptr !== -1 && ptr < asmjsEnv.length) {
+					if (asmjsEnv[ptr] === "{") {
+						level++;
+						ptr++;
+					} else if(asmjsEnv[ptr] === "}") {
+						level--;
+						if (level === 0) {
+							initArrayBuffEnd = ptr + 1;
+							ptr = -1;
+						} else {
+							ptr++;
+						}
+					} else {
+						ptr++;
+					}
+				}
+				asmjsEnv = asmjsEnv.substring(0, initArrayBuff) + `HEAPU8.set(new Uint8Array([${asmjsMem}]), GLOBAL_BASE);` + asmjsEnv.substring(initArrayBuffEnd, asmjsEnv.length + 1);
+			}
 		}
 
-		const wasmFile = wasmBuildName;
-		const wasmContent = buildWASM ? await readFile(path.join(folder, wasmFile)) : "";
 
-		const wasmHex = buildWASM ? wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16)) : [];
 
-		const memoryModule = await readFile(path.join(__dirname, "mem.js"));
+		let wasmHex = [];
+		let wasmEnv = "";
+		let wasmContent = "";
+		let wasmFileName = this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm";
+		if (buildWASM) {
+			let wasmFlags = [inputFile, '-s', 'WASM=1', "-s", "BINARYEN=1", this.minimize ? "-Os" : "-O1"];
 
-		const wasmFileName = this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".wasm";
+			if (options.emccFlags && typeof options.emccFlags === "function") {
+				wasmFlags = options.emccFlags(wasmFlags, "wasm");
+			} else if (options.emccFlags && Array.isArray(options.emccFlags)) {	
+				wasmFlags = wasmFlags.concat(options.emccFlags);
+			}
+			// compile source file to WASM
+			await execFile(options.emccPath, wasmFlags.concat(['-o', indexFile]), {
+				cwd: folder
+			});
 
-		const module = buildModule(options.noWasm, ASMContent, options.fetchFiles, wasmFileName, options.disableMemoryClass, options.publicPath, wasmHex, memoryModule);
+			const wasmFile = wasmBuildName;
+			wasmContent = await readFile(path.join(folder, wasmFile));
+	
+			wasmHex = wasmContent.toString("hex").match(/.{1,2}/g).map(s => parseInt(s, 16));
+			wasmEnv = options.fullEnv ? await readFile(path.join(folder, indexFile)) : "";
 
-		if (options.emitWasm || (options.fetchFiles && buildWASM)) {
+			if (wasmEnv && wasmEnv.length) {
+				wasmEnv = wasmEnv.toString()
+				// remove node require statements
+				.replace(/require\(.fs.\)/gmi, "undefined") 
+				.replace(/require\(.path.\)/gmi, "undefined")
+				// adjust code that causes minify error
+				.replace(".replace(/\\\\/g,\"/\")", ".split('').map(function(s) { return s === '\\\\' ? '/' : s;}).join('');")
+				.replace(/var Module.+?;/gm, "")
+	
+				let initArrayBuff = wasmEnv.indexOf("function instantiateArrayBuffer");
+				let initArrayBuffEnd = initArrayBuff;
+				let level = 0;
+				let ptr = initArrayBuff;
+				while (ptr !== -1 && ptr < wasmEnv.length) {
+					if (wasmEnv[ptr] === "{") {
+						level++;
+						ptr++;
+					} else if(wasmEnv[ptr] === "}") {
+						level--;
+						if (level === 0) {
+							initArrayBuffEnd = ptr + 1;
+							ptr = -1;
+						} else {
+							ptr++;
+						}
+					} else {
+						ptr++;
+					}
+				}
+	
+				wasmEnv = wasmEnv.substring(0, initArrayBuff) + "[custom-loader]" + wasmEnv.substring(initArrayBuffEnd, wasmEnv.length + 1);
+			}
+		}
+
+		let memoryModule = options.memoryClass ? await readFile(path.join(__dirname, "mem.js")) : "";
+		memoryModule = memoryModule.toString();
+
+		const module = buildModule(wasmEnv, asmjsEnv, asmJSCode, asmjsMem, options.fetchFiles, wasmFileName, memoryModule, wasmHex);
+
+		if (buildWASM && options.fetchFiles) {
 			this.emitFile(wasmFileName, wasmContent);
 		}
 
-		if (options.fetchFiles && options.loadAsmjs && this.minimize && ASMContent) {
-			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".asm.js", ASMContent);
+		if (buildASMJS && options.fetchFiles) {
+			this.emitFile(this.resourcePath.split(/\\|\//gmi).pop().split(".").shift() + ".asm.js", asmJSCode);
 		}
 
 		if (folder !== null) {

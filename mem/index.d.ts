@@ -33,6 +33,7 @@ declare class ASM_Memory {
     allocPointer: number;
     private max;
     constructor(buffer: ArrayBuffer);
+    scan(): void;
     set(addr: number, value: number, type?: 1 | 2 | 4 | 40 | 80): this;
     get(addr: number, type?: 1 | 2 | 4 | 40 | 80): number;
     avail(type?: 1 | 2 | 4 | 40 | 80): number;

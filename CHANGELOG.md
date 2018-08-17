@@ -1,3 +1,11 @@
+# 0.8.0 8/16/2018
+- Readme updates.
+- Now supports emscripten complete environments.  They take up WAY more space but provide complete feature support.  The feature is enabled with the new config option `fullEnv`.
+- Changed config options to make more sense: 
+1. `noWasm` is now `wasm` and works the opposite of before.
+2. `loadAsmjs` is now `asmjs` and works just as before.
+3. `disableMemoryClass` is now `memoryClass` and works the opposite of before.
+
 # 0.7.9 - 8/12/2018
 - Fixed an issue with loader options.
 

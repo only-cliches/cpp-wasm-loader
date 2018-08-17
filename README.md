@@ -10,13 +10,15 @@
 
 Load C/C++ source files directly into javascript with a zero bloat.
 
-- Minimal emscripten execution environment, bundles with embedded wasm start at only **1.2kb gzipped**.
+- Optional minimal emscripten execution environment, bundles with embedded wasm start at only **1.2kb gzipped**.
 - WebAssembly can be embedded directly into your JS bundle or shipped separately and loaded asynchronously.
 - Uses `WebAssembly.instantiateStreaming` to bypass Chrome 4k limit for WebAssembly modules.
 - Falls back to `WebAssembly.instantiate` if `WebAssembly.instantiateStreaming` isn't available.
 - Includes an optional memory manager class to easily handle `malloc` and `free` on the javascript side (saves ~6KB).
 - Adding custom javascript functions to call from C/C++ or vise versa is a breaze.
 - Supports optional `ASM.JS` compilation as a Webassembly fallback, works with IE10+.
+- Possible to ship complete WASM bundle with ASMJS fallback in a single js file with **zero** xhr requests.
+- The only C/C++ webpack loader that can inject the full emscripten environment into your bundles.
 
 ## Installation
 1. Install Emscripten following the instructions [here](https://kripken.github.io/emscripten-site/docs/getting_started/downloads.html).
@@ -38,24 +40,35 @@ resolve: {
 ```
 
 ## Webpack Options
-The webpack loader has several options:
+The webpack loader has several options, all of them optional:
 ```js
 {
 	test: /\.(c|cpp)$/,
 	use: {
 		loader: 'cpp-wasm-loader',
 		options: {
-			// emitWasm: Boolean, emit Wasm file built by emscripten to the build folder for debugging.  Has no effect on whether wasm is embedded into the js bundle.
-			// emccFlags: (existingFlags: string[], mode?: "wasm"|"asmjs" ) => existingFlags.concat(["more", "flags", "here"]), add or modify compiler flags
-			// emccPath: String, "path/to/emcc", only needed if emcc is not in PATH,
-			// disableMemoryClass: Boolean, pass `true` to omit the memory manager class in the bundle. Saves ~1kb.
-			// fetchFiles: Boolean, pass `true` to skip embedding the wasm/asmjs files into your js bundle.  You'll need to ship the .wasm and .asm.js files along with your .js files if you use this option.
-			// loadAsmjs: Boolean, pass `true` to compile and embed an ASMJS version of your native code, the loader will fall back to ASMJS if Webassembly isn't supported. This will allow you native code to support IE10+.  If you add a TypedArray/ArrayBuffer polyfill (not included) you can get support back to IE9+.
-			// noWasm: Boolean, pass `true` to disable the Webassembly build/bundle entirely.  Useful with `loadAsmjs` to make ASMJS only bundles.
+			// emccFlags: (existingFlags: string[], mode?: "wasm"|"asmjs" ) => string[],
+			// emccPath: String,
+			// fetchFiles: Boolean, 
+			// memoryClass: Boolean,
+			// asmJs: Boolean, 
+			// wasm: Boolean,
+			// fullEnv: Boolean
 		}
 	}
 }
 ```
+
+
+| Option      | Type                                                       | Default                     | Description                                                                                                                                                                                                                                                                                                                                                                          |
+|-------------|------------------------------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| emccFlags   | (existingFlags: string[], mode?: "wasm"\|"asmjs" ) => string[] | -s WASM=1 -s BINARYEN=1 -Os | Modify compiler flags                                                                                                                                                                                                                                                                                                                                                                |
+| emccPath    | String                                                     |                             | Only needed if emcc is not in PATH                                                                                                                                                                                                                                                                                                                                                   |
+| memoryClass | Boolean                                                    | true                        | Pass `false` to omit the memory manager class in the bundle. Saves ~1kb.                                                                                                                                                                                                                                                                                                             |
+| fetchFiles  | Boolean                                                    | false                       | Pass `true` to skip embedding the wasm/asmjs files into your js bundle.  You'll need to ship the .wasm and .asm.js files along with your .js files if you use this option.                                                                                                                                                                                                           |
+| asmJs       | Boolean                                                    | false                       | Pass `true` to compile and embed an ASMJS version of your native code, the loader will fall back to ASMJS if Webassembly isn't supported. This will allow your native code to support IE10+.  If you add a TypedArray/ArrayBuffer polyfill (not included) you can get support back to IE9+.                                                                                          |
+| wasm        | Boolean                                                    | true                        | Pass `false` to disable the Webassembly build/bundle entirely.  Useful with `asmJs` to make ASMJS only bundles.                                                                                                                                                                                                                                                                  |
+| fullEnv     | Boolean                                                    | false                       | A majority of the default emscripten environment isn't included by default to keep the bundle size down.  To include the complete emscripten environment, pass `true`.  If you get missing exports errors, enable this.  The full enscripten environment takes 10-25KB+ (non gzipped), double that if you're supporting ASMJS & WASM in the same bundle. |
 
 A fully working example webpack config file can be found [here](https://github.com/ClickSimply/cpp-wasm-loader/blob/master/example/webpack.config.js).
 
@@ -329,20 +342,6 @@ wasm.init().then((module) => {
 
 So why not just do javascript variables?  The advantage of using the memory class is we're creating values/variables that can be accessed and modified from javascript *and* WebAssembly/C.  So we can use Javascript to inilitize the values and save the address/pointers to a javascript class, then pass the pointers into C functions when we need to perform expensive calculations.
 
-## Example Bundle Sizes
-
-The table below shows the bundle differences when compiling the project in the `example` folder with different options.  The memory manager class will always add ~1 KB.  As your native code grows larger and more complex including ASMJS support will increase the size of the bundle significantly.  Since the example is so simple and small adding ASMJS support adds minimal code.
-
-| WASM | ASMJS | Memory Manager | Size \* |
-|------|-------|----------------|----------------|
-| ✕    | ✓     | ✕             | 1.0 KB         |
-| ✓    | ✕     | ✕             | 1.2 KB         |
-| ✓    | ✓     | ✕             | 1.3 KB         |
-| ✕    | ✓     | ✓             | 2.1 KB         |
-| ✓    | ✕     | ✓             | 2.3 KB         |
-| ✓    | ✓     | ✓             | 2.4 KB         |
-
-\* All sizes gzipped
 
 ## MIT License
 

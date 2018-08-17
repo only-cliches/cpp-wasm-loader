@@ -64,6 +64,15 @@ class ASM_Memory {
         this.max = buffer.byteLength - 1;
     }
 
+    public scan() {
+        this.mem.char.forEach((val, i) => {
+            if (val > 0) {
+                this.allocPointer = i;
+                this.allocList[i] = true;
+            }
+        })
+    }
+
     public set(addr: number, value: number, type: 1|2|4|40|80 = 40): this {
         if (typeof addr !== "number" || typeof value !== "number") {
             throw new Error("Address & value must be a number!");

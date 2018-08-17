@@ -1,4 +1,5 @@
 #include <emscripten.h>
+#include <stdio.h>
 
 extern "C"
 {
@@ -8,4 +9,3 @@ extern "C"
 		return a + b;
 	}
 }
-
