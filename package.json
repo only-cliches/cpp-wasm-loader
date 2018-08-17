@@ -3,7 +3,7 @@
     "description": "Webpack loader that transforms C/C++ source files into javascript bundles.",
     "author": "Jakub Beránek, Scott Lott",
     "license": "MIT",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "keywords": [
         "wasm",
         "webpack",
