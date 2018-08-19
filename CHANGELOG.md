@@ -1,3 +1,7 @@
+# 0.8.3 8/18/2018
+- Fixed a few nodeJS specific errors.
+- Fixed undefined function error.
+
 # 0.8.2 8/16/2018
 - Fixed NodeJS error.
 - Added check for nodejs builds.

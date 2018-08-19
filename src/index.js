@@ -51,7 +51,7 @@ function minimalEnv(memoryClass) {
 		Module.buffer = buffer
 
 		${!memoryClass ? `
-			Module.asmClass = {};
+			Module.asmClass = {scan: function() {}};
 		` : `				
 			Module.asmClass = new ASM_Memory(Module.buffer);
 		`}
@@ -111,7 +111,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 		initASMJS = `${asmjsEnv.replace("// EMSCRIPTEN_START_ASM",`
 				// EMSCRIPTEN_START_ASM\n
 				${!memoryJS ? `
-					Module.asmClass = {};
+					Module.asmClass = {scan: function() {}};
 				` : `				
 					Module.asmClass = new ASM_Memory(Module.buffer);
 				`} Module.asmLibraryArg = bindMemory(Module.asmLibraryArg, Module.asmClass, "asmjs");`
@@ -125,6 +125,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 						return prev;
 					}, {}),
 					memory: Module.buffer,
+					emModule: Module,
 					${!memoryJS ? "" : "memoryManager: Module.asmClass,"}
 				});
 			}, 10);
@@ -136,7 +137,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 			heap8.set(new Uint8Array([${asmjsMem}]), 8);` : ""}
 
 			${!memoryJS ? `
-				Module.asmClass = {};
+				Module.asmClass = {scan: function() {}};
 			` : `				
 				Module.asmClass = new ASM_Memory(Module.buffer);
 				Module.asmClass.scan();
@@ -152,6 +153,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 					return prev;
 				}, {}),
 				memory: Module.buffer,
+				emModule: Module,
 				${!memoryJS ? "" : "memoryManager: Module.asmClass,"}
 			});
 		`;
@@ -220,7 +222,7 @@ function wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS) {
 			function instantiateArrayBuffer(receiver) {
 				instanceCallback = receiver;
 				${!memoryJS ? `
-					Module.asmClass = {};
+					Module.asmClass = {scan: function() {}};
 				` : `				
 					Module.asmClass = new ASM_Memory(Module.buffer);
 				`}
@@ -265,7 +267,7 @@ function wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS) {
 	
 		globalEnv.env = bindMemory(globalEnv.env, Module.asmClass, "wasm");
 	
-		var path = location.pathname.split("/");
+		var path = typeof location !== "undefined" ? location.pathname.split("/") : [];
 		path.pop();
 	
 		(function() {
