@@ -57,7 +57,7 @@ function minimalEnv(memoryClass) {
 		`}
 
 		var globalEnv = {
-			"global": window,
+			"global": (typeof window !== "undefined" ? window : self),
 			"env": {
 				'_time': function(ptr) {
 					return Date.now();
