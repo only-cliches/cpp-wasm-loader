@@ -1,3 +1,10 @@
+# 0.9.0 8/30/2018
+- Added types to `struct` property.
+- Added `mark` option to set a particular section of memory as used.
+- Loaders use `mark` option to prevent memory class from using global variables set by the emscripten environment.
+- Accepted PR [#11](https://github.com/ClickSimply/cpp-wasm-loader/pull/11) to allow webworker support.
+- A few minor improvements made to the loader scripts.
+
 # 0.8.3 8/18/2018
 - Fixed a few nodeJS specific errors.
 - Fixed undefined function error.

@@ -1,4 +1,4 @@
 const wasm = require("./add.c");
 wasm.init().then(function(mod) {
-    console.log(mod.exports.add(20, 30));
+    console.log(mod.exports.add(2, 3));
 });

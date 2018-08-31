@@ -149,14 +149,14 @@ wasm.init().then((module) => {
 	memory.free(addr);
 
 	// assign object to memory addresses
+	// valid types are i8, i16, i32, f32 & f64
 	const obj = memory.struct([
-		"key", 100,
-		"prop", 20,
+		"key:i32", 100,
+		"prop:i32", 20,
 		"nested", [
-			"value", 10
+			"value:f32", 10
 		]
 	]);
-
 	
 	console.log(memory.get(obj.key)) // 100
 	console.log(memory.get(obj.prop)) // 20

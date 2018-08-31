@@ -29,7 +29,7 @@ module.exports = {
                     memoryClass: false, // disable javascript memory management class,
                     // fetchFiles: true,
                     // asmJs: true,
-                    // wasm: true,
+                    // wasm: false,
                     // fullEnv: true
                 }
             }

@@ -35,6 +35,7 @@ function minimalEnv(memoryClass) {
 		}
 
 		var STATICTOP = 2752;
+		var STACKTOP = STATICTOP;
 		var tempDoublePtr = STATICTOP; STATICTOP += 16;
 		var DYNAMICTOP_PTR = staticAlloc(4);
 
@@ -51,7 +52,7 @@ function minimalEnv(memoryClass) {
 		Module.buffer = buffer
 
 		${!memoryClass ? `
-			Module.asmClass = {scan: function() {}};
+			Module.asmClass = {scan: function() {}, mark: function() {}};
 		` : `				
 			Module.asmClass = new ASM_Memory(Module.buffer);
 		`}
@@ -111,7 +112,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 		initASMJS = `${asmjsEnv.replace("// EMSCRIPTEN_START_ASM",`
 				// EMSCRIPTEN_START_ASM\n
 				${!memoryJS ? `
-					Module.asmClass = {scan: function() {}};
+					Module.asmClass = {scan: function() {}, mark: function() {}};
 				` : `				
 					Module.asmClass = new ASM_Memory(Module.buffer);
 				`} Module.asmLibraryArg = bindMemory(Module.asmLibraryArg, Module.asmClass, "asmjs");`
@@ -119,6 +120,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 
 			setTimeout(function() {
 				Module.asmClass.scan();
+				Module.asmClass.mark(STACKTOP);
 				resolve({
 					exports: Object.keys(asm).reduce(function(prev, cur) {
 						prev[cur.replace("_", "")] = asm[cur];
@@ -137,7 +139,7 @@ function asmJSloader(fetchFiles, asmJSCode, asmjsEnv, wasmFileName, memoryJS, as
 			heap8.set(new Uint8Array([${asmjsMem}]), 8);` : ""}
 
 			${!memoryJS ? `
-				Module.asmClass = {scan: function() {}};
+				Module.asmClass = {scan: function() {}, mark: function() {}};
 			` : `				
 				Module.asmClass = new ASM_Memory(Module.buffer);
 				Module.asmClass.scan();
@@ -222,7 +224,7 @@ function wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS) {
 			function instantiateArrayBuffer(receiver) {
 				instanceCallback = receiver;
 				${!memoryJS ? `
-					Module.asmClass = {scan: function() {}};
+					Module.asmClass = {scan: function() {}, mark: function() {}};
 				` : `				
 					Module.asmClass = new ASM_Memory(Module.buffer);
 				`}
@@ -262,30 +264,33 @@ function wasmLoader(fetchFiles, wasmArray, wasmEnv, wasmFileName, memoryJS) {
 
 		${fetchFiles ? `` : `var wasmBinary = new Uint8Array(${JSON.stringify(wasmArray)})`}
 
-		var init = WebAssembly.instantiateStreaming || WebAssembly.instantiate;
 		var hasStreaming = typeof WebAssembly.instantiateStreaming === "function";
 	
 		globalEnv.env = bindMemory(globalEnv.env, Module.asmClass, "wasm");
-	
-		var path = typeof location !== "undefined" ? location.pathname.split("/") : [];
-		path.pop();
+			
+		${fetchFiles ? `
+			var path = typeof location !== "undefined" ? location.pathname.split("/") : [];
+			path.pop();
+		` : ""}
+
 	
 		(function() {
 			if (hasStreaming) {
-				return init(${fetchFiles ? `fetch(path.join("/") + "/" + "${wasmFileName}")` : `new Response(wasmBinary, {
+				return WebAssembly.instantiateStreaming(${fetchFiles ? `fetch(path.join("/") + "/" + "${wasmFileName}")` : `new Response(wasmBinary, {
 					headers: {
 						"content-type": "application/wasm"
 					}
 				})`}, globalEnv)
 			} else {
 				${fetchFiles ? `return fetch(path.join("/") + "/" + "${wasmFileName}").then(r => r.arrayBuffer()).then((bin) => {
-						return init(bin, globalEnv);
-					});` : `return init(wasmBinary, globalEnv);`}
+						return WebAssembly.instantiate(bin, globalEnv);
+					});` : `return WebAssembly.instantiate(wasmBinary, globalEnv);`}
 			}
 		})().then(function(e) {	
 			if (instanceCallback) {
 				instanceCallback(e);
 			}
+			Module.asmClass.mark(STACKTOP);
 			resolve({
 				raw: e,
 				emModule: Module,
@@ -374,6 +379,9 @@ exports.default = async function loader(content) {
 	let cb = this.async();
 	// let folder = null;
 
+	const wasmBuildName = createBuildWasmName(this.resourcePath, content);
+	const indexFile = wasmBuildName.replace('.wasm', '.js');
+
 	try {
 		const options = (0, _options.loadOptions)(this);
 
@@ -382,9 +390,7 @@ exports.default = async function loader(content) {
 		}
 
 		const inputFile = `input${path.extname(this.resourcePath)}`;
-		const wasmBuildName = createBuildWasmName(this.resourcePath, content);
-		const indexFile = wasmBuildName.replace('.wasm', '.js');
-		
+
 		// folder = await tmpDir();
 		
 		// write source to tmp directory
